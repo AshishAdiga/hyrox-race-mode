@@ -1,0 +1,1953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>RACE MODE — Hyrox Dublin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   DESIGN TOKENS — Race Mode
+   Black/yellow built from race-bib and stopwatch material, not stock palette
+   ============================================================================ */
+:root {
+  /* Surfaces */
+  --ink:          #0a0a0b;
+  --ink-2:        #111113;
+  --surface:      #16161a;
+  --surface-2:    #1d1d22;
+  --surface-3:    #25252c;
+  --line:         #2a2a31;
+  --line-bright:  #38383f;
+
+  /* Signature yellow — desaturated race-bib tone, not traffic-cone */
+  --volt:         #f4d03f;
+  --volt-deep:    #d4af1f;
+  --volt-dim:     rgba(244,208,63,0.14);
+  --volt-dim-2:   rgba(244,208,63,0.07);
+  --volt-line:    rgba(244,208,63,0.35);
+  --on-volt:      #14140c;
+
+  /* Text */
+  --paper:        #f5f3ed;
+  --paper-dim:    #9a9aa2;
+  --paper-faint:  #5c5c64;
+
+  /* Status — used sparingly */
+  --go:           #4ddb8f;
+  --go-dim:       rgba(77,219,143,0.12);
+  --warn:         #ff9f43;
+  --warn-dim:     rgba(255,159,67,0.12);
+  --stop:         #ff4d4d;
+  --stop-dim:     rgba(255,77,77,0.12);
+  --info:         #5ec8e0;
+  --info-dim:     rgba(94,200,224,0.12);
+
+  /* Phase identity colors — subtle, desaturated, never compete with volt */
+  --p1: #6b8cce; --p1-dim: rgba(107,140,206,0.14);
+  --p2: #4ddb8f; --p2-dim: rgba(77,219,143,0.14);
+  --p3: #c879e0; --p3-dim: rgba(200,121,224,0.14);
+  --p4: #ff6b6b; --p4-dim: rgba(255,107,107,0.14);
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(244,208,63,0.05), transparent 45%),
+    radial-gradient(circle at 100% 30%, rgba(244,208,63,0.03), transparent 40%);
+}
+
+::selection { background: var(--volt-dim); color: var(--volt); }
+
+.num { font-family: 'JetBrains Mono', monospace; }
+.display { font-family: 'Archivo Expanded', sans-serif; }
+
+:focus-visible { outline: 2px solid var(--volt); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* ============================================================================
+   HEADER — Race bib week selector (the signature element)
+   ============================================================================ */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: linear-gradient(180deg, var(--ink) 60%, rgba(10,10,11,0.97));
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 0;
+}
+.brand-mark {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.brand-mark .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--volt);
+  box-shadow: 0 0 8px rgba(244,208,63,0.6);
+  flex-shrink: 0;
+}
+.brand-name {
+  font-family: 'Archivo Expanded', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: var(--paper);
+}
+.brand-name .accent { color: var(--volt); }
+
+.countdown-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--paper-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 4px 10px 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.countdown-chip .pulse {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--go);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* The Bib — race-number style week selector */
+.bib-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px 14px;
+}
+.bib {
+  position: relative;
+  background: var(--surface);
+  border: 1.5px solid var(--line-bright);
+  border-radius: var(--r-md);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.bib::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: 14px; right: 14px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--volt) 0 6px, transparent 6px 11px);
+  opacity: 0.5;
+}
+.bib-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--paper-faint);
+  text-transform: uppercase;
+  writing-mode: horizontal-tb;
+}
+.bib-num-wrap { position: relative; }
+.bib-number {
+  font-family: 'Archivo Expanded', sans-serif;
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--volt);
+  letter-spacing: -1px;
+  background: transparent;
+  border: none;
+  width: 64px;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.bib-number::-webkit-outer-spin-button,
+.bib-number::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.bib-of {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--paper-faint);
+  margin-top: 2px;
+}
+
+.bib-nav { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.bib-nav-btn {
+  width: 30px; height: 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--paper-dim);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.bib-nav-btn:active { background: var(--volt-dim); border-color: var(--volt-line); color: var(--volt); }
+
+.phase-strip { flex: 1; min-width: 0; }
+.phase-strip-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--paper-faint);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.phase-strip-name {
+  font-family: 'Archivo Expanded', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+.phase-bar-track {
+  height: 5px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.phase-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Day rail */
+.day-rail {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 18px 12px;
+}
+.day-rail::-webkit-scrollbar { display: none; }
+.day-chip {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--paper-dim);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  text-transform: uppercase;
+}
+.day-chip .tag {
+  display: block;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  margin-top: 1px;
+  opacity: 0.7;
+}
+.day-chip.active {
+  background: var(--volt);
+  border-color: var(--volt);
+  color: var(--on-volt);
+}
+.day-chip.active .tag { color: var(--on-volt); opacity: 0.65; }
+.day-chip.is-rest { opacity: 0.55; }
+
+/* ============================================================================
+   LAYOUT
+   ============================================================================ */
+.view { display: none; padding-bottom: calc(84px + var(--safe-bottom)); }
+.view.active { display: block; animation: fade-in 0.25s ease; }
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.content { padding: 16px 16px 0; max-width: 600px; margin: 0 auto; }
+
+/* ============================================================================
+   BANNERS
+   ============================================================================ */
+.banner {
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid;
+}
+.banner-deload { background: linear-gradient(135deg, var(--warn-dim), rgba(255,159,67,0.04)); border-color: rgba(255,159,67,0.3); }
+.banner-race { background: linear-gradient(135deg, var(--volt-dim), rgba(244,208,63,0.03)); border-color: var(--volt-line); }
+.banner-icon { font-size: 22px; flex-shrink: 0; line-height: 1.2; }
+.banner-title { font-family: 'Archivo Expanded', sans-serif; font-weight: 700; font-size: 14px; margin-bottom: 4px; letter-spacing: 0.2px; }
+.banner-deload .banner-title { color: var(--warn); }
+.banner-race .banner-title { color: var(--volt); font-size: 18px; letter-spacing: 1px; }
+.banner-text { font-size: 12.5px; color: var(--paper-dim); line-height: 1.55; }
+
+/* ============================================================================
+   SESSION CARD
+   ============================================================================ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.card-head {
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.card-head::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+}
+.card-icon {
+  width: 40px; height: 40px;
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px;
+  flex-shrink: 0;
+}
+.card-title-group { flex: 1; min-width: 0; }
+.card-title { font-family: 'Archivo Expanded', sans-serif; font-weight: 700; font-size: 15.5px; letter-spacing: 0.1px; }
+.card-sub { font-size: 11.5px; color: var(--paper-faint); margin-top: 1px; }
+.card-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.block { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.block:last-child { border-bottom: none; }
+.block-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin-bottom: 10px;
+}
+
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tag-pace { background: var(--p3-dim); border-color: rgba(200,121,224,0.3); color: var(--p3); }
+.tag-hr { background: var(--stop-dim); border-color: rgba(255,77,77,0.3); color: #ff8a8a; }
+.tag-load { background: var(--info-dim); border-color: rgba(94,200,224,0.3); color: var(--info); }
+.tag-rpe { background: var(--warn-dim); border-color: rgba(255,159,67,0.3); color: var(--warn); }
+.tag-sets { background: var(--go-dim); border-color: rgba(77,219,143,0.3); color: var(--go); }
+
+.structure-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: var(--paper-dim);
+  line-height: 1.85;
+  white-space: pre-line;
+}
+
+.cue-prose { font-size: 13px; color: var(--paper-dim); line-height: 1.65; white-space: pre-line; }
+.cue-prose strong { color: var(--paper); font-weight: 600; }
+
+/* ============================================================================
+   SUPERSET GROUPS
+   ============================================================================ */
+.ss-group {
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: 13px 14px;
+  margin-bottom: 10px;
+  border-left: 3px solid var(--line-bright);
+}
+.ss-group:last-child { margin-bottom: 0; }
+.ss-group.ss-1 { border-left-color: var(--info); }
+.ss-group.ss-2 { border-left-color: var(--p3); }
+.ss-group.ss-3 { border-left-color: var(--volt); }
+.ss-group.ss-4 { border-left-color: var(--p2); }
+.ss-group.ss-5 { border-left-color: var(--warn); }
+.ss-group.straight { background: transparent; padding: 0; border-left-color: transparent; }
+
+.ss-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  margin-bottom: 10px;
+}
+
+.exercise-row { padding: 4px 0; }
+.exercise-row + .exercise-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.exercise-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.exercise-name { font-weight: 600; font-size: 14px; color: var(--paper); }
+.exercise-cue { font-size: 12px; color: var(--paper-faint); line-height: 1.5; margin-top: 3px; }
+.exercise-meta { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+
+.ss-note {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: var(--volt);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line-bright);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ============================================================================
+   STATION BLOCK
+   ============================================================================ */
+.station-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.station-row:last-child { border-bottom: none; }
+.station-row.special { background: var(--volt-dim-2); }
+.station-emoji { font-size: 20px; flex-shrink: 0; }
+.station-info { flex: 1; min-width: 0; }
+.station-name { font-weight: 600; font-size: 13.5px; }
+.station-row.special .station-name { color: var(--volt); }
+
+/* ============================================================================
+   LOGGING — set-by-set inputs
+   ============================================================================ */
+.log-block {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-bright);
+}
+.log-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 9px;
+}
+.log-block-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--volt);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.saved-flag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--go);
+  opacity: 0;
+  transition: opacity 0.25s;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.saved-flag.show { opacity: 1; }
+
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  flex-wrap: wrap;
+}
+.set-row:last-child { margin-bottom: 0; }
+.set-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--paper-faint);
+  width: 42px;
+  flex-shrink: 0;
+  letter-spacing: 0.3px;
+}
+.field {
+  flex: 1;
+  min-width: 0;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--paper);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.field:focus { border-color: var(--volt); background: var(--ink); }
+.field::placeholder { color: var(--paper-faint); }
+.field-reps { flex: 0.55; }
+.field-x { font-family: 'JetBrains Mono', monospace; color: var(--paper-faint); font-size: 11px; flex-shrink: 0; }
+.set-prev {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  color: var(--paper-faint);
+  width: 100%;
+  padding-left: 49px;
+  margin-top: -3px;
+}
+.set-prev .v { color: var(--volt-deep); }
+
+.single-log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.single-log-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--paper-faint);
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+.prev-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--volt-deep);
+  background: var(--volt-dim-2);
+  border-radius: 6px;
+  padding: 3px 9px;
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ============================================================================
+   REST DAY
+   ============================================================================ */
+.rest-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 44px 24px;
+  text-align: center;
+}
+.rest-glyph {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-bright);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  margin: 0 auto 16px;
+}
+.rest-title {
+  font-family: 'Archivo Expanded', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.5px;
+  color: var(--paper-dim);
+  margin-bottom: 10px;
+}
+.rest-text { font-size: 13px; color: var(--paper-faint); line-height: 1.6; max-width: 320px; margin: 0 auto; }
+
+/* ============================================================================
+   NUTRITION CARD
+   ============================================================================ */
+.nutri-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--volt);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.nutri-head {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--volt);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nutri-item { display: flex; gap: 11px; margin-bottom: 9px; align-items: flex-start; }
+.nutri-item:last-child { margin-bottom: 0; }
+.nutri-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--on-volt);
+  background: var(--volt);
+  border-radius: 5px;
+  padding: 3px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.nutri-text { font-size: 12.5px; color: var(--paper-dim); line-height: 1.5; }
+
+/* ============================================================================
+   PROGRESS RAIL
+   ============================================================================ */
+.progress-rail { margin-bottom: 16px; }
+.progress-rail-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 7px;
+}
+.progress-rail-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--paper-faint);
+  text-transform: uppercase;
+}
+.progress-rail-pct { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--volt); font-weight: 600; }
+.progress-rail-track { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.progress-rail-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--volt-deep), var(--volt));
+  border-radius: 3px;
+  transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 0 10px rgba(244,208,63,0.4);
+}
+
+/* ============================================================================
+   BOTTOM NAV
+   ============================================================================ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(17,17,19,0.92);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+  display: flex;
+  z-index: 200;
+  padding-bottom: var(--safe-bottom);
+}
+.nav-btn {
+  flex: 1;
+  padding: 11px 4px 9px;
+  text-align: center;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  color: var(--paper-faint);
+  text-transform: uppercase;
+  transition: color 0.15s;
+  position: relative;
+}
+.nav-btn.active { color: var(--volt); }
+.nav-btn.active::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 28px; height: 2px;
+  background: var(--volt);
+  border-radius: 2px;
+}
+.nav-icon { font-size: 19px; display: block; margin-bottom: 3px; }
+
+/* ============================================================================
+   REFERENCE TAB — collapsibles
+   ============================================================================ */
+.ref-section { margin-bottom: 10px; }
+.ref-header {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 15px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.ref-header-left { display: flex; align-items: center; gap: 11px; }
+.ref-icon {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.ref-title { font-weight: 600; font-size: 13.5px; }
+.ref-arrow { color: var(--paper-faint); font-size: 11px; transition: transform 0.2s; }
+.ref-arrow.open { transform: rotate(180deg); color: var(--volt); }
+.ref-body {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  display: none;
+}
+.ref-body.open { display: block; }
+
+.zone-row { display: flex; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line); gap: 11px; }
+.zone-row:last-child { border-bottom: none; }
+.zone-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.zone-name { font-weight: 600; font-size: 12.5px; width: 86px; flex-shrink: 0; }
+.zone-range { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--paper-faint); flex: 1; }
+.zone-pace { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--paper-dim); text-align: right; }
+
+.mcgill-item { padding: 13px 16px; border-bottom: 1px solid var(--line); }
+.mcgill-item:last-child { border-bottom: none; }
+.mcgill-name { font-weight: 600; font-size: 13.5px; margin-bottom: 5px; color: var(--volt); }
+.mcgill-desc { font-size: 12.5px; color: var(--paper-dim); line-height: 1.55; }
+
+.race-station-ref { display: flex; align-items: center; padding: 11px 16px; border-bottom: 1px solid var(--line); gap: 12px; }
+.race-station-ref:last-child { border-bottom: none; }
+.race-station-ref.run { background: var(--p3-dim); }
+.station-num-ref { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 17px; color: var(--volt); width: 26px; text-align: center; flex-shrink: 0; }
+.station-info-ref { flex: 1; }
+.station-name-ref { font-weight: 600; font-size: 13.5px; }
+.station-spec-ref { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--paper-faint); margin-top: 1px; }
+.station-target-ref { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--volt); text-align: right; white-space: nowrap; flex-shrink: 0; }
+
+.flag-item { display: flex; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--line); align-items: flex-start; }
+.flag-item:last-child { border-bottom: none; }
+.flag-pill { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 600; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; margin-top: 1px; letter-spacing: 0.3px; }
+.flag-stop { background: var(--stop-dim); color: var(--stop); border: 1px solid rgba(255,77,77,0.3); }
+.flag-warn { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(255,159,67,0.3); }
+.flag-ok { background: var(--go-dim); color: var(--go); border: 1px solid rgba(77,219,143,0.3); }
+.flag-text { font-size: 12.5px; color: var(--paper-dim); line-height: 1.5; }
+
+/* ============================================================================
+   LOG VIEW
+   ============================================================================ */
+.log-hero { margin-bottom: 18px; }
+.log-hero-title { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 26px; letter-spacing: 0.3px; margin-bottom: 5px; }
+.log-hero-title .accent { color: var(--volt); }
+.log-hero-sub { font-size: 12.5px; color: var(--paper-faint); }
+
+.log-week-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); margin-bottom: 9px; overflow: hidden; }
+.log-week-head { padding: 13px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid var(--line); }
+.log-week-title { font-weight: 700; font-size: 13.5px; font-family: 'Archivo Expanded', sans-serif; }
+.log-week-count { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--volt); background: var(--volt-dim-2); padding: 3px 8px; border-radius: 6px; }
+.log-week-body { display: none; }
+.log-week-body.open { display: block; }
+.log-row { padding: 10px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.log-row:last-child { border-bottom: none; }
+.log-row-day { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--paper-faint); text-transform: uppercase; width: 30px; flex-shrink: 0; margin-top: 2px; letter-spacing: 0.3px; }
+.log-row-name { font-size: 12.5px; color: var(--paper-dim); flex: 1; }
+.log-row-val { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--volt); text-align: right; white-space: nowrap; font-weight: 500; }
+
+.log-empty { text-align: center; padding: 60px 24px; }
+.log-empty-icon { font-size: 38px; margin-bottom: 14px; opacity: 0.6; }
+.log-empty-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+.log-empty-text { font-size: 12.5px; color: var(--paper-faint); line-height: 1.5; max-width: 260px; margin: 0 auto; }
+
+.danger-btn {
+  width: 100%;
+  padding: 13px;
+  background: transparent;
+  border: 1px solid rgba(255,77,77,0.3);
+  border-radius: var(--r-md);
+  color: var(--stop);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  margin-top: 18px;
+  cursor: pointer;
+}
+.danger-btn:active { background: var(--stop-dim); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="header-brand">
+    <div class="brand-mark">
+      <span class="dot"></span>
+      <span class="brand-name">RACE<span class="accent">MODE</span></span>
+    </div>
+    <div class="countdown-chip"><span class="pulse"></span><span id="countdownText">25 WKS TO DUBLIN</span></div>
+    <span id="syncStatus" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--paper-faint);margin-left:2px;" title="Sync status">○</span>
+  </div>
+
+  <div class="bib-row">
+    <div class="bib">
+      <span class="bib-label">WK</span>
+      <div class="bib-num-wrap">
+        <input class="bib-number num" type="number" id="weekInput" min="1" max="25" value="1" inputmode="numeric">
+      </div>
+      <span class="bib-of num">/25</span>
+    </div>
+    <div class="bib-nav">
+      <button class="bib-nav-btn" onclick="changeWeek(1)" aria-label="Next week">▲</button>
+      <button class="bib-nav-btn" onclick="changeWeek(-1)" aria-label="Previous week">▼</button>
+    </div>
+    <div class="phase-strip">
+      <div class="phase-strip-label">Phase</div>
+      <div class="phase-strip-name" id="phaseName">Foundation</div>
+      <div class="phase-bar-track"><div class="phase-bar-fill" id="phaseBarFill" style="width:16%;background:var(--p1);"></div></div>
+    </div>
+  </div>
+
+  <div class="day-rail" id="dayRail">
+    <div class="day-chip active" data-day="0" onclick="switchDay(0)">MON<span class="tag">strength</span></div>
+    <div class="day-chip" data-day="1" onclick="switchDay(1)">TUE<span class="tag">run+ski</span></div>
+    <div class="day-chip" data-day="2" onclick="switchDay(2)">WED<span class="tag">hypertrophy</span></div>
+    <div class="day-chip" data-day="3" onclick="switchDay(3)">THU<span class="tag">key run</span></div>
+    <div class="day-chip" data-day="4" onclick="switchDay(4)">FRI<span class="tag">power+stations</span></div>
+    <div class="day-chip" data-day="5" onclick="switchDay(5)">SAT<span class="tag">long/brick</span></div>
+    <div class="day-chip is-rest" data-day="6" onclick="switchDay(6)">SUN<span class="tag">rest</span></div>
+  </div>
+</header>
+
+<!-- TODAY VIEW -->
+<div id="trainingView" class="view active">
+  <div class="content" id="dayContent"></div>
+</div>
+
+<!-- LOG VIEW -->
+<div id="logView" class="view">
+  <div class="content" id="logContent"></div>
+</div>
+
+<!-- REFERENCE VIEW -->
+<div id="referenceView" class="view">
+  <div class="content" id="referenceContent"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="btnTraining" onclick="switchView('training')">
+    <span class="nav-icon">▣</span>TODAY
+  </button>
+  <button class="nav-btn" id="btnLog" onclick="switchView('log')">
+    <span class="nav-icon">◷</span>LOG
+  </button>
+  <button class="nav-btn" id="btnReference" onclick="switchView('reference')">
+    <span class="nav-icon">◈</span>GUIDE
+  </button>
+</nav>
+
+<script type="module">
+/* ============================================================================
+   DATA LAYER — programmed sessions, all 25 weeks, all phases
+   (FB1 / FB2 / FB3 / Tue / Thu / Sat session generators)
+   ============================================================================ */
+const PHASES = {
+  1:{name:"FOUNDATION",label:"phase-1",weeks:[1,2,3,4,5,6],dates:"18 May – 28 Jun"},
+  2:{name:"BUILD",label:"phase-2",weeks:[7,8,9,10,11,12,13,14],dates:"29 Jun – 23 Aug"},
+  3:{name:"PEAK",label:"phase-3",weeks:[15,16,17,18,19,20],dates:"24 Aug – 4 Oct"},
+  4:{name:"TAPER",label:"phase-4",weeks:[21,22,23,24,25],dates:"5 Oct – 8 Nov"},
+};
+
+function getPhase(wk) {
+  for (const [p,pd] of Object.entries(PHASES)) if (pd.weeks.includes(wk)) return parseInt(p);
+  return 1;
+}
+
+// ─── SESSION DATA ──────────────────────────────────────────────────────────────
+
+function getFB1(wk) {
+  // Monday: Heavy Strength
+  const loads = {
+    backSquat:{
+      // Capped at 120kg — progression via sets/reps/tempo, not load
+      1:"110kg",2:"110kg",3:"112.5kg",4:"112.5kg",5:"115kg",6:"115kg",
+      7:"115kg",8:"117.5kg",9:"117.5kg",10:"DELOAD 95kg",
+      11:"117.5kg",12:"120kg",13:"120kg",14:"120kg",
+      15:"120kg",16:"120kg",17:"120kg",18:"120kg",19:"120kg",20:"120kg",
+      21:"115kg",22:"112.5kg",23:"110kg",24:"107.5kg",25:"Race week — skip"},
+    pullUp:{1:"BW+15kg",2:"BW+15kg",3:"BW+17kg",4:"BW+17kg",5:"BW+20kg",6:"BW+20kg",
+            7:"BW+25kg",8:"BW+25kg",9:"BW+27kg",10:"DELOAD BW only",
+            11:"BW+27kg",12:"BW+28kg",13:"BW+30kg",14:"BW+30kg",
+            15:"BW+32kg",16:"BW+32kg",17:"MAX attempt",18:"BW+30kg",19:"BW+32kg",20:"BW+33kg",
+            21:"BW+28kg",22:"BW+25kg",23:"BW+22kg",24:"BW+20kg",25:"Skip"},
+    rdl:{
+      // Conservative — start 80kg, +2.5kg every 2 weeks, hard cap 120kg
+      1:"80kg",2:"80kg",3:"82.5kg",4:"82.5kg",5:"85kg",6:"85kg",
+      7:"87.5kg",8:"87.5kg",9:"90kg",10:"DELOAD 75kg",
+      11:"92.5kg",12:"92.5kg",13:"95kg",14:"97.5kg",
+      15:"100kg",16:"102.5kg",17:"105kg",18:"107.5kg",19:"110kg",20:"112.5kg",
+      21:"110kg",22:"105kg",23:"100kg",24:"95kg",25:"Skip"},
+    ohp:{1:"60kg",2:"62.5kg",3:"65kg",4:"65kg",5:"67.5kg",6:"70kg",
+         7:"70kg",8:"72.5kg",9:"72.5kg",10:"DELOAD 60kg",
+         11:"75kg",12:"75kg",13:"77.5kg",14:"77.5kg",
+         15:"77.5kg",16:"80kg",17:"80kg",18:"80kg",19:"82.5kg",20:"82.5kg",
+         21:"75kg",22:"72.5kg",23:"70kg",24:"65kg",25:"Skip"},
+    cgbench:{
+      // Close-grip bench — replaces dips
+      1:"70kg",2:"72.5kg",3:"75kg",4:"75kg",5:"77.5kg",6:"80kg",
+      7:"80kg",8:"82.5kg",9:"85kg",10:"DELOAD 70kg",
+      11:"87.5kg",12:"90kg",13:"92.5kg",14:"95kg",
+      15:"95kg",16:"97.5kg",17:"100kg",18:"100kg",19:"102.5kg",20:"105kg",
+      21:"97.5kg",22:"95kg",23:"90kg",24:"85kg",25:"Skip"},
+  };
+  const ph = getPhase(wk);
+  const sets = {
+    1:{sq:"4×5",pu:"4×5",rdl:"4×6",ohp:"3×6",cgb:"3×6"},
+    2:{sq:"5×4",pu:"5×4",rdl:"4×5",ohp:"4×5",cgb:"4×5"},
+    3:{sq:"5×3",pu:"5×3",rdl:"4×5",ohp:"4×4",cgb:"4×4"},
+    4:{sq:"3×3",pu:"3×4",rdl:"3×5",ohp:"3×5",cgb:"3×5"}}[ph];
+
+  // Phase-specific squat cue
+  const sqCue = ph===1
+    ? "High bar or low bar — whichever feels natural. HARD CAP: never go above 120kg. Depth to parallel minimum. 3.5 min rest."
+    : ph===2
+    ? "5 sets now. Progression is density and volume, not weight. Stay in the 110-120kg range. Pause at the bottom 2s in Ph2."
+    : ph===3
+    ? "3-second descent mandatory. Slow eccentric is the stimulus now that load is capped. Control every rep."
+    : "Taper. 3 sets only. Same feel, less volume.";
+
+  return {
+    type:"strength", title:"FB1 — Heavy Strength", icon:"🏋️", iconBg:"var(--teal-dim)",
+    time:"Lunchtime · ~48 min", badge:"MONDAY",
+    warmup:"McGill Big 3 (8 min) → Goblet squat 2×10 BW → Band pull-apart 2×15 → Dead hang 2×20s",
+    groups:[
+      {type:"straight",label:"A — STRAIGHT SETS · 3.5 min rest",exercises:[
+        {name:"Back Squat",spec:`${sets.sq} · ${loads.backSquat[wk]}`,rpe:"8–8.5",
+         cue:`LOAD CAP: 120kg maximum all program. ${sqCue}`}
+      ]},
+      {type:"pair",pairClass:"pair-1",label:"B1/B2 — SUPERSET · move immediately · 2.5 min rest after B2",exercises:[
+        {name:"Weighted Pull-Up (neutral grip)",spec:`${sets.pu} · ${loads.pullUp[wk]}`,rpe:"8.5–9.5",
+         cue:"Dead hang at bottom. Ph1 controlled, Ph2-3 explosive up. 3s descent. No kipping. Neutral grip always."},
+        {name:"Barbell RDL",spec:`${sets.rdl} · ${loads.rdl[wk]}`,rpe:"7.5–8.5",
+         cue:"CONSERVATIVE LOAD. Neutral spine non-negotiable. Bar drags shins. Stop at mid-shin. ANY lumbar sensation — reduce load immediately. Cap: 120kg."},
+      ]},
+      {type:"pair",pairClass:"pair-2",label:"C1/C2 — SUPERSET · move immediately · 2 min rest after C2",exercises:[
+        {name:"Standing Barbell OHP",spec:`${sets.ohp} · ${loads.ohp[wk]}`,rpe:"8.5–9.5",
+         cue:"Strict — zero leg drive. Full lockout at top. Glutes squeezed. Move straight to close-grip bench."},
+        {name:"Close-Grip Bench Press",spec:`${sets.cgb} · ${loads.cgbench[wk]}`,rpe:"8.5–9.5",
+         cue:"Hands shoulder-width or slightly narrower. Elbows tucked at 45° — never flare. Full lockout at top. 3s descent. Replaces dips — no shoulder impingement risk."},
+      ]},
+      {type:"straight",label:"D — CORE FINISHER · 60s rest between exercises",exercises:[
+        {name:"McGill Big 3 + Ab Wheel",spec:ph<3?"3 sets":"3 sets (full rollout)",rpe:"6–7",
+         cue:"Curl-up 10 reps (8s hold). Side plank 30–45s/side. Ab wheel: hollow body, no lower back arch."}
+      ]},
+    ]
+  };
+}
+
+function getFB2(wk) {
+  // Wednesday: Hypertrophy
+  const ph = getPhase(wk);
+  const loads = {
+    bench:{1:"2×32kg",2:"2×34kg",3:"2×34kg",4:"2×36kg",5:"2×36kg",6:"2×38kg",
+           7:"2×38kg+DROP",8:"2×40kg+DROP",9:"2×40kg+DROP",10:"DELOAD 2×32kg",
+           11:"2×42kg+DROP",12:"2×42kg+DROP",13:"2×44kg+DROP",14:"2×44kg+DROP",
+           15:"2×44kg+REST-PAUSE",16:"2×46kg",17:"2×46kg",18:"2×48kg",19:"2×48kg",20:"2×48kg",
+           21:"2×42kg",22:"2×40kg",23:"2×38kg",24:"2×36kg",25:"Skip"},
+    row:{1:"60kg",2:"62.5kg",3:"65kg",4:"65kg",5:"67.5kg",6:"70kg",
+         7:"70kg",8:"72.5kg",9:"75kg",10:"DELOAD 60kg",
+         11:"77.5kg",12:"80kg",13:"82.5kg",14:"82.5kg",
+         15:"85kg",16:"85kg",17:"87.5kg",18:"87.5kg",19:"90kg",20:"90kg",
+         21:"80kg",22:"77.5kg",23:"75kg",24:"72.5kg",25:"Skip"},
+    incline:{1:"2×30kg",2:"2×32kg",3:"2×32kg",4:"2×34kg",5:"2×34kg",6:"2×36kg",
+             7:"2×36kg+DROP",8:"2×38kg+DROP",9:"2×38kg+DROP",10:"DELOAD 2×28kg",
+             11:"2×40kg+DROP",12:"2×40kg+DROP",13:"2×42kg+DROP",14:"2×42kg+DROP",
+             15:"2×42kg+REST-PAUSE",16:"2×44kg",17:"2×44kg",18:"2×46kg",19:"2×46kg",20:"2×46kg",
+             21:"2×38kg",22:"2×36kg",23:"2×34kg",24:"2×32kg",25:"Skip"},
+    lat:{1:"70kg",2:"72.5kg",3:"75kg",4:"75kg",5:"77.5kg",6:"80kg",
+         7:"80kg",8:"82.5kg",9:"85kg",10:"DELOAD 70kg",
+         11:"87.5kg",12:"90kg",13:"92.5kg",14:"95kg",
+         15:"95kg",16:"97.5kg",17:"97.5kg",18:"100kg",19:"100kg",20:"100kg",
+         21:"87.5kg",22:"85kg",23:"82.5kg",24:"80kg",25:"Skip"},
+    split:{1:"2×20kg",2:"2×22kg",3:"2×22kg",4:"2×24kg",5:"2×24kg",6:"2×26kg",
+           7:"2×26kg",8:"2×28kg",9:"2×28kg",10:"DELOAD 2×20kg",
+           11:"2×30kg",12:"2×30kg",13:"2×32kg",14:"2×32kg",
+           15:"2×32kg",16:"2×34kg",17:"2×34kg",18:"2×36kg",19:"2×36kg",20:"2×38kg",
+           21:"2×28kg",22:"2×26kg",23:"2×24kg",24:"2×22kg",25:"Skip"},
+    curl:{1:"18kg",2:"18kg",3:"20kg",4:"20kg",5:"20kg",6:"22kg",
+          7:"22kg",8:"22kg",9:"24kg",10:"DELOAD 16kg",
+          11:"24kg",12:"24kg",13:"26kg",14:"26kg",
+          15:"26kg",16:"26kg",17:"28kg",18:"28kg",19:"28kg",20:"30kg",
+          21:"22kg",22:"22kg",23:"20kg",24:"20kg",25:"Skip"},
+  };
+  const setsMap = {
+    1:{bench:"4×10",row:"4×10",incline:"3×10",lat:"3×10",split:"3×10",curl:"3×12"},
+    2:{bench:"4×8",row:"4×10",incline:"4×10",lat:"4×10",split:"3×8",curl:"3×10"},
+    3:{bench:"4×8",row:"4×10",incline:"4×8",lat:"4×10",split:"3×8",curl:"3×10"},
+    4:{bench:"2×10",row:"2×10",incline:"2×10",lat:"2×10",split:"2×8",curl:"2×12"},
+  };
+  const s = setsMap[ph];
+  const dropNote = ph===2?" + DROP SET final set":ph===3?" + REST-PAUSE final set":"";
+
+  return {
+    type:"strength", title:"FB2 — Hypertrophy", icon:"💪", iconBg:"var(--purple-dim)",
+    time:"Free day · ~50 min", badge:"WEDNESDAY",
+    warmup:"McGill Big 3 (8 min) → Face pull 2×15 light → Incline DB fly 1×12 light\nLower body: split squat + hamstring curl ONLY — protects Thursday run.",
+    groups:[
+      {type:"pair",pairClass:"pair-1",label:"A1/A2 — SUPERSET · 75s rest after A2",exercises:[
+        {name:"DB Bench Press (Flat)",spec:`${s.bench}${dropNote} · ${loads.bench[wk]}`,rpe:"8–9",
+         cue:"Full range — DBs touch chest. Explosive up, 3s down. Elbows 75°. Move to cable row immediately."},
+        {name:"Seated Cable Row",spec:`${s.row} · ${loads.row[wk]}`,rpe:"8–8.5",
+         cue:"Chest tall. Row to lower sternum. Hold 1s squeeze. Control return. V-bar Ph1-2, wide grip Ph3."},
+      ]},
+      {type:"pair",pairClass:"pair-2",label:"B1/B2 — SUPERSET · 75s rest after B2",exercises:[
+        {name:"Incline DB Press",spec:`${s.incline}${dropNote} · ${loads.incline[wk]}`,rpe:"8–9",
+         cue:"15-30° incline. Upper chest emphasis. Move to lat pulldown immediately."},
+        {name:"Lat Pulldown (Neutral grip)",spec:`${s.lat} · ${loads.lat[wk]}`,rpe:"8–8.5",
+         cue:"Pull to upper chest. Elbows drive down and back. Full stretch at top. Ph3: alternate with straight-arm pulldown."},
+      ]},
+      {type:"pair",pairClass:"pair-3",label:"C1/C2 — SUPERSET · 90s rest after C2",exercises:[
+        {name:"Bulgarian Split Squat",spec:`${s.split}/leg · ${loads.split[wk]}`,rpe:"8–8.5",
+         cue:"Rear foot on bench. Front shin vertical. Torso upright. Full depth. Safe for Thursday run."},
+        {name:"Seated Hamstring Curl",spec:`${s.split} · RPE 8${ph>=2?"+DROP":""} `,rpe:"8–8.5",
+         cue:"Full extension at start. Curl to peak, hold 1s. 3s return. Ph2: drop set final set."},
+      ]},
+      {type:"triset",pairClass:"pair-4",label:"D1/D2/D3 — TRISET · 90s rest after D3",exercises:[
+        {name:"Incline DB Curl",spec:`${s.curl} · ${loads.curl[wk]}`,rpe:"7.5–8.5",
+         cue:"45° incline. Full hang at bottom. Long head fully stretched. Squeeze + hold 1s at top."},
+        {name:"Decline Crunch",spec:ph>=2?"3×15 + plate":"3×15",rpe:"7",
+         cue:"Slow controlled crunch. Don't pull neck. Feel upper abs contract. Ph2: add 5-10kg plate."},
+        {name:"Plank / RKC Plank",spec:ph>=3?"3×45s RKC":ph===2?"3×40s":"3×30s",rpe:"7–8",
+         cue:"Ph1-2: Standard plank. Ph3: RKC — squeeze fists, glutes, quads, abs simultaneously."},
+      ]},
+    ]
+  };
+}
+
+function getFB3(wk) {
+  // Friday: Athletic Power + Hyrox Stations
+  const ph = getPhase(wk);
+  const powerLoads = {
+    push:{1:"65kg",2:"67.5kg",3:"70kg",4:"70kg",5:"72.5kg",6:"75kg",
+          7:"75kg",8:"77.5kg",9:"80kg",10:"DELOAD 65kg",
+          11:"82.5kg",12:"85kg",13:"87.5kg",14:"90kg",
+          15:"90kg",16:"92.5kg",17:"95kg",18:"95kg",19:"97.5kg",20:"100kg target",
+          21:"85kg",22:"82.5kg",23:"80kg",24:"75kg",25:"Skip"},
+    nordic:{1:"3 reps",2:"3 reps",3:"4 reps",4:"4 reps",5:"5 reps",6:"5 reps",
+            7:"5 reps",8:"6 reps",9:"7 reps",10:"DELOAD 3×3",
+            11:"7 reps",12:"8 reps",13:"8 reps",14:"8 reps full unassisted",
+            15:"4×8 full",16:"4×8 full",17:"4×8 full",18:"4×8 full",19:"4×8 full",20:"4×8 full",
+            21:"2×6",22:"2×6",23:"2×6",24:"2×4",25:"Skip"},
+  };
+  const pushSets = ph===1?"4×6":ph===2?"4×5":ph===3?"5×4":"3×5";
+  const swingSets = ph===1?"4×15":ph===2?"5×15":ph===3?"5×12":"3×12";
+  const jumpSets = ph===1?"4×5":ph===2?"5×5":ph===3?"5×5":"3×3";
+
+  const stationFormat = ph===1
+    ? "ISOLATION: 3 sets per station · 90s rest between sets"
+    : ph===2
+    ? "CIRCUIT: All stations = 1 round · no rest within round · 3 min rest after round · 3 rounds"
+    : ph===3
+    ? "RACE SIM: 1 heavy round · record every time · no running (that's Saturday)"
+    : "TAPER: 2 rounds key stations only · stay sharp";
+
+  const stationLoads = {
+    ski:{1:"500m @RPE 7",2:"750m @230-240m/min",3:"1000m @race pace",4:"500m @race pace"},
+    row:{1:"500m @RPE 7",2:"750m @2:30/500m",3:"1000m target <3:30",4:"500m @race pace"},
+    sledPush:{1:"45s sled only",2:"60s @60→100kg",3:"75s @130-140kg",4:"45s @100kg"},
+    sledPull:{1:"40s light",2:"55s @50→80kg",3:"70s @90-100kg",4:"Skip"},
+    carry:{1:"60s @2×24kg",2:"90s @2×24kg",3:"120s @2×24kg",4:"60s @2×24kg"},
+    lunge:{1:"60s @15kg",2:"90s @20kg",3:"150s @20kg",4:"Skip"},
+    burpee:{1:"15 reps",2:"30 reps",3:"45 reps",4:"20 reps"},
+    wallBall:{1:"3×15 reps @6kg",2:"3×25-35 reps @6kg",3:"100 reps @6kg after all stations",4:"2×20 reps"},
+  };
+
+  return {
+    type:"stations", title:"FB3 — Athletic + Hyrox", icon:"⚡", iconBg:"var(--orange-dim)",
+    time:"Free day · ~50 min", badge:"FRIDAY",
+    warmup:"McGill Big 3 (8 min) → Jump squat 2×5 BW → Hip hinge drill 1×10 BW",
+    groups:[
+      {type:"straight",label:"POWER BLOCK — always done fresh · full rest between sets",exercises:[
+        {name:"Push Press",spec:`${pushSets} · ${powerLoads.push[wk]}`,rpe:"8.5–9.5",
+         cue:"Dip with legs (quarter squat) — DRIVE with legs as you press. Full lockout overhead. Leg drive IS the point. Rest 3 min."},
+        {name:"KB Swing",spec:`${swingSets} · 28kg`,rpe:"8–9",
+         cue:"HIP HINGE — not a squat. Hike bell back aggressively. SNAP hips forward. Lock glutes hard at top. Rest 90s."},
+        {name:"Broad Jump",spec:`${jumpSets} · MAX effort`,rpe:"9–9.5",
+         cue:"Full arm swing. Drive hips back. EXPLODE forward. Land soft. LOG DISTANCE EVERY WEEK — tracks explosive development. Rest 2 min."},
+      ]},
+      {type:"straight",label:"NORDIC CURL — 2.5 min rest between sets",exercises:[
+        {name:"Nordic Curl",spec:`3 sets · ${powerLoads.nordic[wk]}`,rpe:"8.5–9",
+         cue:"Anchor feet. Lower as SLOWLY as possible — 5 FULL SECONDS mandatory. Ph1: hands catch every rep. Ph3: full unassisted reps."},
+      ]},
+    ],
+    stationFormat,
+    stations:[
+      {name:"Ski Erg",load:stationLoads.ski[ph],icon:"🎿"},
+      {name:"Rowing",load:stationLoads.row[ph],icon:"🚣"},
+      {name:"Sled Push",load:stationLoads.sledPush[ph],icon:"💥"},
+      {name:"Sled Pull",load:stationLoads.sledPull[ph],icon:"🔗"},
+      {name:"Farmers Carry",load:stationLoads.carry[ph],icon:"🏋️"},
+      {name:"Sandbag Lunge",load:stationLoads.lunge[ph],icon:"🚶"},
+      {name:"Burpee Broad Jump",load:stationLoads.burpee[ph],icon:"🦘"},
+      {name:"Wall Ball",load:stationLoads.wallBall[ph],icon:"🏀",special:true},
+    ]
+  };
+}
+
+function getTue(wk) {
+  const ph = getPhase(wk);
+  const runMin = {1:20,2:22,3:25,4:25,5:28,6:30,7:30,8:33,9:35,10:25,
+                  11:35,12:35,13:35,14:38,15:35,16:35,17:30,18:35,19:30,20:35,
+                  21:25,22:20,23:15,24:20,25:0}[wk];
+  const skiWork = {
+    1:"4×90s @220m/min",2:"4×90s @222m/min",3:"5×90s @225m/min",
+    4:"5×2min @225m/min",5:"5×2min @230m/min",6:"4×2min @230m/min + 1km TT",
+    7:"5×2min @233m/min",8:"5×2min @235m/min",9:"6×2min @235m/min",
+    10:"DELOAD 3×90s @225m/min",11:"5×2min @238m/min",12:"4×3min @240m/min",
+    13:"4×3min @242m/min",14:"5×3min @245m/min",
+    15:"4×3min @248m/min",16:"5×3min @250m/min",17:"4×3min @250m/min",
+    18:"4×3min @252m/min",19:"3×3min @250m/min",20:"5×3min @255m/min PEAK",
+    21:"3×2min @245m/min",22:"3×90s @245m/min",23:"2×90s @245m/min",
+    24:"RACE WEEK — skip ski erg",25:"Post-race — rest"
+  }[wk];
+  const runPace = ph===1?"5:45–6:10/km":ph===2?"5:25–5:55/km":"5:20–5:45/km";
+  const strides = (ph>=2 && wk!==10) || [5,6].includes(wk);
+
+  if (wk===25) return {type:"rest",title:"Post-Race Recovery",icon:"🏆",message:"No running for 7-10 days minimum after Hyrox. Active recovery only — walking, light cycling. Rest and reflect. You've done it."};
+  if (wk===24) return {
+    type:"run",title:"Easy Run + Strides",icon:"🏃",iconBg:"var(--green-dim)",
+    time:"Lunchtime · 30 min",badge:"TUE · RACE WEEK",
+    structure:`${runMin} min very easy + 4×100m strides`,
+    pace:"5:50–6:10/km",hr:"Z1–Z2: <150 bpm",
+    skiWork:"NO SKI ERG — race week",
+    cue:"Race week. Easy jog then 4 strides. Strides wake up the neuromuscular system. Nothing more. Race is Sunday."
+  };
+  return {
+    type:"run",title:"Easy Run + Ski Erg",icon:"🏃",iconBg:"var(--green-dim)",
+    time:"Lunchtime · ~50 min",badge:"TUESDAY",
+    structure:`${runMin} min easy run${strides?" + 6–8×100m strides":""}\n3 min walk rest\n${skiWork}\n90s rest between ski intervals`,
+    pace:`Run: ${runPace} | Ski: see load`,
+    hr:"Run Z2: 137–157 | Ski Z3–Z4: 160–182 bpm",
+    skiWork,
+    cue:"RUN: Conversational pace. Full sentences. HR below 157. Treadmill 1% incline or outdoors.\nRECOVERY: 3 min walk between run and ski. Let HR drop below 140.\nSKI ERG: Arms drive DOWN past hips — not backward. Hip hinge 10-15°. Legs contribute. Most common fault: arm-only pull."
+    + (strides?"\nSTRIDES: Accelerate 60m, hold 20m, decelerate. Full 60s recovery. Builds leg speed for 4:00/km.":"")
+  };
+}
+
+function getThu(wk) {
+  const ph = getPhase(wk);
+  if (wk===24||wk===25) return {type:"rest",title:"Rest",icon:"😴",message:wk===24?"Race week — full rest Thursday. Race is Sunday. Save everything.":"Post-race recovery. Rest."};
+  const sessions = {
+    1:{struct:"10min easy\n3×5min @4:35/km threshold\n90s jog recovery\n10min easy",pace:"TH: 4:35/km",hr:"Z4: 172–182 bpm",cue:"3-4 words max during intervals. Consistent pace — don't go hard on rep 1 and fade. This is where 4:00/km gets built."},
+    2:{struct:"10min easy\n4×5min @4:33/km threshold\n90s jog recovery\n10min easy",pace:"TH: 4:33/km",hr:"Z4: 172–182 bpm",cue:"One more interval than Wk1. Same pace. Volume is the stress. Don't let pace drift."},
+    3:{struct:"10min easy\n3×8min @4:30/km threshold\n2min jog recovery\n10min easy",pace:"TH: 4:30/km",hr:"Z4: 172–182 bpm",cue:"8-min intervals force sustained threshold effort. You can't hide in a short rep."},
+    4:{struct:"10min easy\n20min continuous tempo @4:48/km\n10min easy",pace:"Tempo: 4:48/km",hr:"Z3–Z4: 160–178 bpm",cue:"First continuous tempo — no rest. Harder than intervals. Breathing laboured but controlled. Pace consistent."},
+    5:{struct:"10min easy\n5×5min @4:28/km threshold\n90s jog recovery\n10min easy",pace:"TH: 4:28/km",hr:"Z4: 172–182 bpm",cue:"5 intervals — highest threshold volume Phase 1. Fade on rep 4/5 = you started too hard."},
+    6:{struct:"10min easy\n25min continuous tempo @4:45/km\n10min easy + 6×100m strides",pace:"Tempo: 4:45/km",hr:"Z3–Z4: 160–178 bpm",cue:"Phase 1 peak tempo. 25 min sustained. Strides at end assess leg speed after threshold."},
+    7:{struct:"10min easy + drills\n4×8min @4:28/km threshold\n2min jog recovery\n10min easy",pace:"TH: 4:28/km",hr:"Z4: 172–182 bpm",cue:"Phase 2 threshold. 8-min intervals. Consistent pace across all 4."},
+    8:{struct:"10min easy + drills\n6×1km @4:30/km\n2min rest\n10min easy",pace:"RP: 4:30/km",hr:"Z4: 172–182 bpm",cue:"FIRST RACE PACE INTERVALS. 4:30/km stepping stone to 4:00. Focus on form: high hips, midfoot strike."},
+    9:{struct:"10min easy + drills\n5×8min @4:25/km threshold\n2min jog recovery\n10min easy",pace:"TH: 4:25/km",hr:"Z4: 172–182 bpm",cue:"5×8 min — highest threshold volume yet. Pace consistent across all 5."},
+    10:{struct:"10min easy\n3×6min @4:30/km threshold — DELOAD\n90s jog\n6×100m strides\n10min easy",pace:"TH: 4:30/km deload",hr:"Z4: 172–182 bpm",cue:"DELOAD: reduced volume, same pace. In and out. Strides maintain leg speed."},
+    11:{struct:"10min easy + drills + 4 build-ups\n8×1km @4:20/km\n90s rest\n10min easy + 6×100m strides",pace:"RP: 4:20/km",hr:"Z4–Z5: 175–185 bpm",cue:"8 reps at 4:20/km. 90s rest teaches fast recovery. Closing in on race pace."},
+    12:{struct:"10min easy + drills\n4×10min @4:23/km threshold\n2min jog recovery\n10min easy + 6×strides",pace:"TH: 4:23/km",hr:"Z4: 172–182 bpm",cue:"10-min threshold intervals. Mental toughness test. Last 2 min of each rep hurts. Stay the pace."},
+    13:{struct:"10min easy + drills\n10×1km @4:10/km\n90s rest\n10min easy + 6×strides",pace:"RP: 4:10/km",hr:"Z4–Z5: 175–188 bpm",cue:"10 reps at 4:10/km. LANDMARK SESSION. Complete this and 4:00/km is within reach."},
+    14:{struct:"10min easy + drills\n5×10min @4:20/km threshold\n2min jog recovery\n10min easy",pace:"TH: 4:20/km",hr:"Z4: 172–182 bpm",cue:"5×10 min threshold. Elite-level volume. Pace consistent across all 5. Don't be a hero on rep 1."},
+    15:{struct:"10min easy + drills + 4 build-ups\n8×1km @4:00/km\n2min rest\n10min easy + 6×strides",pace:"4:00/km — TARGET RACE PACE",hr:"Z4–Z5: 176–192 bpm",cue:"TARGET RACE PACE. 4:00/km. This is what Dublin demands. Every rep is a direct investment in sub-60."},
+    16:{struct:"10min easy + drills\n4×2km @4:05/km\n2min rest\n10min easy + 6×strides",pace:"RP: 4:05/km",hr:"Z4–Z5: 176–192 bpm",cue:"2km reps simulate arriving at Hyrox stations fatigued. The last 800m of each rep is the most race-specific running you'll do."},
+    17:{struct:"10min easy + drills\n10×1km @4:00/km\n90s rest\n10min easy + 6×strides",pace:"4:00/km · 90s rest",hr:"Z4–Z5: 176–192 bpm",cue:"10 REPS AT RACE PACE. 90s rest mimics transition time. Complete this session and you WILL run 4:00/km in Dublin."},
+    18:{struct:"10min easy + drills\n6×1km @3:55/km\n2min rest\n10min easy + strides @3:25/km",pace:"3:55/km — FASTER than race",hr:"Z5: 182–196 bpm",cue:"SUB-RACE-PACE. Training above target so race day 4:00/km feels controlled. The most important psychological session."},
+    19:{struct:"10min easy + drills\n20min continuous @4:00/km\n10min easy",pace:"4:00/km sustained 20 min",hr:"Z4–Z5: 176–192 bpm",cue:"Sustained race pace with no rest. Mental toughness session. Breathing laboured. Hold the pace. Proves you can sustain it."},
+    20:{struct:"10min easy + drills\n12×1km @4:00/km\n90s rest\n10min easy + 6×strides",pace:"4:00/km · 90s rest",hr:"Z4–Z5: 176–192 bpm",cue:"12 REPS AT RACE PACE — PEAK SESSION OF THE PROGRAM. Complete this and you are ready for Dublin. Don't go out too fast on rep 1."},
+    21:{struct:"15min easy + drills\n5×1km @3:55/km\n2min rest\n10min easy",pace:"3:55/km",hr:"Z5: 182–196 bpm",cue:"TAPER: Volume drops 40%. Intensity stays the same. You will feel fresh and restless. Trust the taper."},
+    22:{struct:"15min easy + drills\n4×1km @3:55/km\n2min rest\n10min easy",pace:"3:55/km",hr:"Z5: 182–196 bpm",cue:"One less rep than Wk21. Same pace. Legs should feel springy. That is the taper working."},
+    23:{struct:"15min easy + drills\n3×1km @3:55/km\n2min rest\n10min easy",pace:"3:55/km",hr:"Z5: 182–196 bpm",cue:"Three quality reps. That is enough. Two weeks to race day. Body is primed."},
+  };
+  const s = sessions[wk];
+  return {
+    type:"run",title:"Key Run Session",icon:"🎯",iconBg:"var(--accent-dim)",
+    time:"Lunchtime · ~50-60 min",badge:"THURSDAY — KEY SESSION",
+    structure:s.struct,pace:s.pace,hr:s.hr,cue:s.cue
+  };
+}
+
+function getSat(wk) {
+  const ph = getPhase(wk);
+  if (wk===24) return {type:"rest",title:"REST — Race Tomorrow",icon:"🏁",message:"Full rest. Light walk 20-30 min only. Eat well. Sleep early. Visualise the race from start to finish. You have done 24 weeks of work. Trust it."};
+  if (wk===25) return {type:"rest",title:"Post-Race Recovery",icon:"🏆",message:"You've done it. Rest. No running 7-10 days minimum. Active recovery only."};
+
+  const longRuns = {1:"35min",2:"40min",3:"45min",4:"50min",5:"55min",6:"5km TT",
+                    7:"65min",8:"70min",9:"75min",10:"DELOAD 55min",
+                    11:"80min",14:"90min — LONG RUN PEAK",20:"75min — FINAL LONG RUN",
+                    21:"50min easy + mini brick",22:"45min easy + mini brick",23:"40min very easy"};
+  const isBrick = [12,13,15,16,17,18,19,21,22].includes(wk);
+  const isLongRun = !isBrick;
+  const pace = ph===1?"5:30–6:00/km":ph===2?"5:05–5:35/km":"5:10–5:30/km";
+
+  const brickSessions = {
+    12:{struct:"60min easy run @5:20/km\nImmediately into stations:\n→ Row 1000m @2:35/500m\n→ Lunge 150s @20kg\n→ Carry 120s @2×24kg\n→ 1km run @4:30/km\nRecord all times",cue:"FIRST BRICK. The transition from run to station to run is the race skill. Don't stop at transitions. Heavy legs on the final km = race day. Record every split."},
+    13:{struct:"65min easy run\nAll stations:\n→ Ski 1000m → Sled push 45s @110kg → Sled pull 40s @80kg\n→ Row 1000m → Carry 120s → Lunge 150s\n→ 1km run @4:20/km\nRecord every split",cue:"Full station sequence after easy running. Every station time recorded. Compare to Friday FB3 times."},
+    15:{struct:"FULL RACE SIM @4:10/km:\n8 runs (1km each) between all 8 stations\nRecord every split",cue:"Full race simulation. Runs at 4:10/km — slightly conservative. Finish time + 5% = Dublin prediction. Record everything."},
+    16:{struct:"FULL RACE SIM @4:05/km:\nAll 8 runs + all 8 stations\nCompare to Week 15",cue:"Second full simulation. 5 sec faster than Wk15. Focus on transitions — no stopping, no hesitating."},
+    17:{struct:"FULL RACE SIM @4:00/km — RACE PACE:\nAll 8 runs + all 8 stations\nRecord every split — THIS IS YOUR RACE PREDICTION",cue:"Race pace simulation. Finish time here + 3-5% = your Dublin result. If you finish 61-63 min here, you go sub-60 on race day (fresher legs + adrenaline)."},
+    18:{struct:"FULL RACE SIM @4:00/km:\nAll 8 runs + all 8 stations\nFocus: transitions and mental strategy",cue:"Third full simulation. Execute your race plan. Practice self-talk. Dublin is 6 weeks away."},
+    19:{struct:"75min easy run @5:15/km\nMini brick:\n1km @4:00 → ski 500m → row 500m → 1km @4:00\n× 2 rounds",cue:"Lighter Saturday. Long easy run then targeted station work. Quality over quantity."},
+    21:{struct:"50min easy + mini brick:\n1km @4:00 → ski 500m → row 500m → 1km @4:00 × 2",cue:"Keep race feel in legs. Short brick — not exhausting. Remind body what race pace feels like."},
+    22:{struct:"45min easy + mini brick:\n1km @4:00 → ski 500m → sled push 45s → 1km @4:00",cue:"Short and sharp. Feel the race movements. You should feel fast — taper is working."},
+  };
+
+  if (isBrick && brickSessions[wk]) {
+    const b = brickSessions[wk];
+    return {
+      type:"brick",title:wk<=13?"Brick Session":`Race Simulation Wk${wk}`,icon:"🧱",iconBg:"var(--purple-dim)",
+      time:"Free day · 90+ min",badge:`SATURDAY · ${ph===3?"RACE SIM":"BRICK"}`,
+      structure:b.struct,pace:"Easy run: "+pace+" | Station runs: 4:00–4:30/km",
+      hr:"Z2 easy | Z4–Z5 on stations",cue:b.cue
+    };
+  }
+
+  const lrMin = longRuns[wk]||(ph===2?70:ph===3?75:50)+"min";
+  const isTT = wk===6;
+  return {
+    type:"run",title:isTT?"5km Time Trial":"Long Run",icon:"🏃",iconBg:"var(--blue||'var(--teal-dim)')".replace("||'var(--teal-dim)'",""),
+    time:"Free day · "+(isTT?"45 min":"75–90 min"),badge:"SATURDAY — DON'T SKIP",
+    structure:isTT?"10min easy warm-up\n5km time trial — record exact time\n2km easy cool-down":`${lrMin} easy continuous`,
+    pace:isTT?"5km target: sub-22:00 (4:24/km)":pace,
+    hr:isTT?"Z4–Z5 during TT":"Z2: 137–157 bpm",
+    cue:isTT?"Phase 1 fitness test. Don't taper for it — test on normal fatigue. Pace evenly. This sets Phase 2 targets.":
+    "Easiest pace of the week. Finish feeling like you could do 15 more min. Gel every 25-30 min over 45 min. Never skip Saturday."
+  };
+}
+
+const REST_DAY = (msg) => ({type:"rest", message: msg||"Full rest. Sleep well. Eat well. Let the adaptations consolidate."});
+
+function getSessionForDay(wk, dayIdx) {
+  if (wk===25 && dayIdx!==1) return REST_DAY("Post-race recovery week. No training.");
+  switch(dayIdx) {
+    case 0: return getFB1(wk);    // Mon
+    case 1: return getTue(wk);    // Tue
+    case 2: return getFB2(wk);    // Wed
+    case 3: return getThu(wk);    // Thu
+    case 4: return getFB3(wk);    // Fri
+    case 5: return getSat(wk);    // Sat
+    case 6: return REST_DAY("Sunday — full rest. Adaptation happens during recovery, not during training.");
+    default: return REST_DAY();
+  }
+}
+
+
+
+/* ============================================================================
+   FIREBASE — Firestore cloud sync + localStorage fallback
+   Every write goes to both. Reads come from Firestore on load,
+   falling back to localStorage if offline.
+   ============================================================================ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA29E90-N-sdYUyoffeiVsi85HQeteuDSU",
+  authDomain: "hyrox-dublin.firebaseapp.com",
+  projectId: "hyrox-dublin",
+  storageBucket: "hyrox-dublin.firebasestorage.app",
+  messagingSenderId: "251584341799",
+  appId: "1:251584341799:web:4a42b16116c0ed4284ab02"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+// Single Firestore document — one doc holds all log data for this athlete
+const LOG_DOC = doc(db, "athletes", "ashish");
+const STORAGE_KEY = "raceModeLog_v2";
+let LOG_DATA = {};
+let DB_READY = false;
+
+// Sync indicator in header
+function showSyncStatus(state) {
+  let el = document.getElementById("syncStatus");
+  if (!el) return;
+  el.textContent = state === "saving" ? "↑" : state === "saved" ? "✓" : state === "offline" ? "○" : "";
+  el.style.color = state === "saved" ? "var(--go)" : state === "saving" ? "var(--volt)" : "var(--paper-faint)";
+}
+
+// Load from Firestore on startup, fall back to localStorage
+async function initStorage() {
+  // Load localStorage immediately so UI isn't blank while Firestore responds
+  try {
+    const local = localStorage.getItem(STORAGE_KEY);
+    if (local) LOG_DATA = JSON.parse(local);
+  } catch(e) {}
+
+  try {
+    const snap = await getDoc(LOG_DOC);
+    if (snap.exists()) {
+      LOG_DATA = snap.data().log || {};
+      // Write cloud data back to localStorage so offline works
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(LOG_DATA));
+    }
+    DB_READY = true;
+    showSyncStatus("saved");
+  } catch(e) {
+    console.warn("Firestore unavailable, using localStorage", e);
+    showSyncStatus("offline");
+  }
+}
+
+// Debounced Firestore write — batches rapid keystrokes into one write
+let _syncTimer = null;
+function scheduleSyncToFirestore() {
+  showSyncStatus("saving");
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    if (!DB_READY) return;
+    try {
+      await setDoc(LOG_DOC, { log: LOG_DATA, updatedAt: new Date().toISOString() });
+      showSyncStatus("saved");
+    } catch(e) {
+      console.warn("Firestore write failed", e);
+      showSyncStatus("offline");
+    }
+  }, 1200); // wait 1.2s after last keystroke before writing
+}
+
+function loadLog() { return LOG_DATA; }
+
+function saveLog(data) {
+  LOG_DATA = data;
+  // Always write localStorage immediately (works offline)
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+  // Queue Firestore write
+  scheduleSyncToFirestore();
+}
+
+function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''); }
+
+function getLogValue(wk, dayIdx, key) {
+  const wkKey = `wk${wk}`, dayKey = `d${dayIdx}`;
+  return LOG_DATA[wkKey]?.[dayKey]?.[key] || "";
+}
+function setLogValue(wk, dayIdx, key, displayName, value) {
+  const wkKey = `wk${wk}`, dayKey = `d${dayIdx}`;
+  if (!LOG_DATA[wkKey]) LOG_DATA[wkKey] = {};
+  if (!LOG_DATA[wkKey][dayKey]) LOG_DATA[wkKey][dayKey] = {};
+  if (value.trim() === "") delete LOG_DATA[wkKey][dayKey][key];
+  else LOG_DATA[wkKey][dayKey][key] = value;
+  if (!LOG_DATA[wkKey][dayKey].__names) LOG_DATA[wkKey][dayKey].__names = {};
+  LOG_DATA[wkKey][dayKey].__names[key] = displayName;
+  saveLog(LOG_DATA);
+}
+function getLastValue(wk, dayIdx, key, lookback=4) {
+  for (let back=1; back<=lookback; back++) {
+    const prevWk = wk - back;
+    if (prevWk < 1) break;
+    const v = getLogValue(prevWk, dayIdx, key);
+    if (v) return {value: v, weeksAgo: back};
+  }
+  return null;
+}
+function handleInput(el, wk, dayIdx, key, name) {
+  setLogValue(wk, dayIdx, key, name, el.value);
+  const flag = el.closest(".log-block")?.querySelector(".saved-flag");
+  if (flag) {
+    flag.classList.add("show");
+    clearTimeout(flag._t);
+    flag._t = setTimeout(()=>flag.classList.remove("show"), 1100);
+  }
+}
+
+function parseSpec(spec) {
+  if (!spec) return {sets:3, repsHint:"reps", loadHint:"load"};
+  const setsMatch = spec.match(/(\d+)\s*×/);
+  const sets = setsMatch ? parseInt(setsMatch[1]) : 3;
+  const repsMatch = spec.match(/×\s*(\d+)/);
+  const repsHint = repsMatch ? repsMatch[1] : "reps";
+  const loadMatch = spec.match(/([\d.]+kg(?:\/\w+)?|BW\+?[\d.]*kg?|2×[\d.]+kg)/i);
+  const loadHint = loadMatch ? loadMatch[0] : "load";
+  return {sets, repsHint, loadHint};
+}
+
+function renderSetLogRows(wk, dayIdx, exName, spec) {
+  const {sets, repsHint, loadHint} = parseSpec(spec);
+  const exSlug = slugify(exName);
+  let rows = "";
+  for (let i=1; i<=sets; i++) {
+    const loadKey = `${exSlug}__s${i}_load`, repsKey = `${exSlug}__s${i}_reps`;
+    const curLoad = getLogValue(wk, dayIdx, loadKey);
+    const curReps = getLogValue(wk, dayIdx, repsKey);
+    const lwLoad = getLastValue(wk, dayIdx, loadKey);
+    const lwReps = getLastValue(wk, dayIdx, repsKey);
+    const lwText = (lwLoad || lwReps)
+      ? `<div class="set-prev">prev: <span class="v">${lwLoad?.value||'–'}${lwReps?.value?' × '+lwReps.value:''}</span></div>` : "";
+    rows += `
+      <div class="set-row">
+        <span class="set-tag">SET ${i}</span>
+        <input type="text" class="field" placeholder="${loadHint}" value="${curLoad.replace(/"/g,'&quot;')}"
+          oninput="handleInput(this, ${wk}, ${dayIdx}, '${loadKey}', '${exName.replace(/'/g,"\\'")} — set ${i} load')">
+        <span class="field-x">×</span>
+        <input type="text" class="field field-reps" placeholder="${repsHint}" value="${curReps.replace(/"/g,'&quot;')}"
+          oninput="handleInput(this, ${wk}, ${dayIdx}, '${repsKey}', '${exName.replace(/'/g,"\\'")} — set ${i} reps')">
+      </div>
+      ${lwText}`;
+  }
+  return `
+    <div class="log-block">
+      <div class="log-block-head">
+        <span class="log-block-title">⏺ LOG YOUR SETS</span>
+        <span class="saved-flag">✓ SAVED</span>
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function renderSingleLog(wk, dayIdx, name, placeholder) {
+  const slug = slugify(name);
+  const cur = getLogValue(wk, dayIdx, slug);
+  const lw = getLastValue(wk, dayIdx, slug);
+  const lwHtml = lw ? `<div class="prev-pill">📌 ${lw.weeksAgo===1?'last week':lw.weeksAgo+' wks ago'}: ${lw.value}</div>` : "";
+  return `
+    <div class="log-block">
+      <div class="log-block-head">
+        <span class="single-log-label">YOU DID</span>
+        <span class="saved-flag">✓ SAVED</span>
+      </div>
+      <input type="text" class="field" placeholder="${placeholder||'enter value'}" value="${cur.replace(/"/g,'&quot;')}"
+        oninput="handleInput(this, ${wk}, ${dayIdx}, '${slug}', '${name.replace(/'/g,"\\'")}')">
+      ${lwHtml}
+    </div>`;
+}
+
+/* ============================================================================
+   RENDER ENGINE
+   ============================================================================ */
+let currentWeek = 1, currentDay = 0;
+
+const PHASE_COLOR = {1:"var(--p1)",2:"var(--p2)",3:"var(--p3)",4:"var(--p4)"};
+const PHASE_DIM    = {1:"var(--p1-dim)",2:"var(--p2-dim)",3:"var(--p3-dim)",4:"var(--p4-dim)"};
+
+function renderRest(sess) {
+  return `
+    <div class="rest-card">
+      <div class="rest-glyph">${sess.icon||'◌'}</div>
+      <div class="rest-title">${sess.title||'REST DAY'}</div>
+      <div class="rest-text">${sess.message||'Full rest. Adaptation happens during recovery, not during training.'}</div>
+    </div>`;
+}
+
+function renderRun(sess, wk, dayIdx) {
+  let html = `
+    <div class="card">
+      <div class="card-head" style="--bar:var(--p2)">
+        <div class="card-icon" style="background:var(--p2-dim);">${sess.icon||'↗'}</div>
+        <div class="card-title-group"><div class="card-title">${sess.title}</div><div class="card-sub">${sess.time}</div></div>
+        <div class="card-tag" style="background:var(--p2-dim);color:var(--p2);">${sess.badge||''}</div>
+      </div>
+      <div class="block">
+        <div class="block-eyebrow">SESSION</div>
+        <div class="tag-row">
+          <span class="tag tag-pace">◷ ${sess.pace}</span>
+          <span class="tag tag-hr">♡ ${sess.hr}</span>
+        </div>
+        <div class="structure-mono">${sess.structure}</div>
+        ${renderSingleLog(wk, dayIdx, sess.title+"_pace", "e.g. 4:32/km avg")}
+      </div>`;
+  if (sess.skiWork) {
+    html += `<div class="block">
+        <div class="block-eyebrow">SKI ERG TARGET</div>
+        <span class="tag tag-load">⛷ ${sess.skiWork}</span>
+        ${renderSingleLog(wk, dayIdx, sess.title+"_ski", "e.g. 235m/min")}
+      </div>`;
+  }
+  html += `<div class="block">
+        <div class="block-eyebrow">COACHING CUES</div>
+        <div class="cue-prose">${sess.cue.replace(/\n/g,'<br>')}</div>
+      </div>
+      <div class="block">
+        <div class="block-eyebrow">HOW IT FELT</div>
+        ${renderSingleLog(wk, dayIdx, sess.title+"_feel", "avg HR / RPE / notes")}
+      </div>
+    </div>`;
+  return html;
+}
+
+function renderStrength(sess, wk, dayIdx) {
+  let html = `
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--info-dim);">${sess.icon||'▣'}</div>
+        <div class="card-title-group"><div class="card-title">${sess.title}</div><div class="card-sub">${sess.time}</div></div>
+        <div class="card-tag" style="background:var(--info-dim);color:var(--info);">${sess.badge||''}</div>
+      </div>
+      <div class="block">
+        <div class="block-eyebrow">WARM-UP — EVERY SESSION</div>
+        <div class="cue-prose">${sess.warmup}</div>
+      </div>`;
+
+  sess.groups.forEach((grp, gi) => {
+    const ssClasses = ["ss-1","ss-2","ss-3","ss-4","ss-5"];
+    const cls = grp.type==="straight" ? "straight" : (ssClasses[gi%5]);
+    html += `<div class="block">
+        <div class="ss-group ${cls}">
+          <div class="ss-label">${grp.label}</div>`;
+    grp.exercises.forEach((ex) => {
+      html += `
+          <div class="exercise-row">
+            <div class="exercise-top">
+              <div>
+                <div class="exercise-name">${ex.name}</div>
+                <div class="exercise-cue">${ex.cue}</div>
+              </div>
+              <div class="exercise-meta">
+                <span class="tag tag-sets">${ex.spec}</span>
+                <span class="tag tag-rpe">RPE ${ex.rpe}</span>
+              </div>
+            </div>
+            ${renderSetLogRows(wk, dayIdx, ex.name, ex.spec)}
+          </div>`;
+    });
+    if (grp.type==="pair") html += `<div class="ss-note">⟲ move immediately, no rest until both done</div>`;
+    if (grp.type==="triset") html += `<div class="ss-note">⟲ all 3 back to back, rest after the third</div>`;
+    html += `</div></div>`;
+  });
+  html += `</div>`;
+
+  if (sess.stations) {
+    html += `<div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--volt-dim);">◎</div>
+        <div class="card-title-group"><div class="card-title">Hyrox Station Block</div><div class="card-sub">${sess.stationFormat}</div></div>
+      </div>`;
+    sess.stations.forEach(st => {
+      html += `<div class="block" style="padding:0;">
+          <div class="station-row ${st.special?'special':''}">
+            <span class="station-emoji">${st.icon}</span>
+            <div class="station-info">
+              <div class="station-name">${st.name}${st.special?' ⭐':''}</div>
+              <span class="tag tag-load" style="margin-top:5px;">${st.load}</span>
+            </div>
+          </div>
+          <div style="padding:0 18px 16px;">
+            ${renderSingleLog(wk, dayIdx, "station_"+st.name, "time or reps achieved")}
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+  return html;
+}
+
+function renderBrick(sess, wk, dayIdx) {
+  return `
+    <div class="card">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--p3-dim);">${sess.icon||'◫'}</div>
+        <div class="card-title-group"><div class="card-title">${sess.title}</div><div class="card-sub">${sess.time}</div></div>
+        <div class="card-tag" style="background:var(--p3-dim);color:var(--p3);">${sess.badge||''}</div>
+      </div>
+      <div class="block">
+        <div class="block-eyebrow">SESSION</div>
+        <div class="tag-row">
+          <span class="tag tag-pace">◷ ${sess.pace}</span>
+          <span class="tag tag-hr">♡ ${sess.hr}</span>
+        </div>
+        <div class="structure-mono">${sess.structure}</div>
+        ${renderSingleLog(wk, dayIdx, sess.title+"_finish", "total finish time")}
+      </div>
+      <div class="block">
+        <div class="block-eyebrow">COACHING CUES</div>
+        <div class="cue-prose">${sess.cue.replace(/\n/g,'<br>')}</div>
+      </div>
+    </div>`;
+}
+
+function renderSession(sess, wk, dayIdx) {
+  if (!sess || sess.type==="rest") return renderRest(sess||{});
+  if (sess.type==="run") return renderRun(sess, wk, dayIdx);
+  if (sess.type==="strength" || sess.type==="stations") return renderStrength(sess, wk, dayIdx);
+  if (sess.type==="brick") return renderBrick(sess, wk, dayIdx);
+  return renderRest(sess);
+}
+
+const NUTRI_CARDS = {
+  0:{t:"MONDAY · HEAVY STRENGTH",items:[
+    ["3H BEFORE","Mixed meal — rice or oats + protein + veg. No high-fat foods."],
+    ["30M BEFORE","Banana or 30g oats. Coffee if you use it."],
+    ["WITHIN 30M","40-50g protein + carbs. Crucial after heavy compounds."]]},
+  1:{t:"TUESDAY · RUN + SKI",items:[
+    ["2H BEFORE","Light meal — toast, banana, yoghurt."],
+    ["AFTER","Normal meal, protein + carbs within 1 hour."]]},
+  2:{t:"WEDNESDAY · HYPERTROPHY",items:[
+    ["3H BEFORE","Mixed meal — carbs + protein."],
+    ["AFTER","Protein + carbs within 30 min. Big dinner — Thursday key run tomorrow."]]},
+  3:{t:"THURSDAY · KEY RUN",items:[
+    ["3H BEFORE","Proper carb meal — rice, pasta, oats. This session needs fuel."],
+    ["45M BEFORE","Banana + coffee. Gel optional for Phase 3 sessions over 50 min."],
+    ["WITHIN 30M","Protein shake or meal immediately. Hardest session — recovery starts now."]]},
+  4:{t:"FRIDAY · POWER + STATIONS",items:[
+    ["3H BEFORE","Mixed meal — carbs + protein. Don't train fasted."],
+    ["30M BEFORE","Banana + coffee."],
+    ["AFTER","Big dinner — Saturday long run tomorrow."]]},
+  5:{t:"SATURDAY · LONG RUN / BRICK",items:[
+    ["2-3H BEFORE","Bigger carb meal — oats, toast, banana."],
+    ["DURING","Gel every 25-30 min on runs over 45 min. Use your race gel brand."],
+    ["AFTER","Biggest meal of the week. Carbs + protein + veg."]]},
+  6:{t:"SUNDAY · REST",items:[
+    ["TODAY","Eat well, high protein, plenty of carbs. Hydrate. Sleep 8+ hours."]]},
+};
+
+function renderNutriCard(dayIdx) {
+  const n = NUTRI_CARDS[dayIdx];
+  if (!n) return "";
+  let html = `<div class="nutri-card"><div class="nutri-head">◆ FUEL — ${n.t}</div>`;
+  n.items.forEach(([time,text]) => {
+    html += `<div class="nutri-item"><span class="nutri-time">${time}</span><span class="nutri-text">${text}</span></div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function renderDay(wk, dayIdx) {
+  const sess = getSessionForDay(wk, dayIdx);
+  const isDeload = wk===10;
+  const ph = getPhase(wk);
+  const pct = Math.round((wk/25)*100);
+
+  let html = `
+    <div class="progress-rail">
+      <div class="progress-rail-top">
+        <span class="progress-rail-label">Week ${wk} of 25</span>
+        <span class="progress-rail-pct">${pct}%</span>
+      </div>
+      <div class="progress-rail-track"><div class="progress-rail-fill" style="width:${pct}%"></div></div>
+    </div>`;
+
+  if (isDeload) {
+    html += `<div class="banner banner-deload">
+      <div class="banner-icon">◐</div>
+      <div><div class="banner-title">DELOAD WEEK</div>
+      <div class="banner-text">Volume drops ~40%. Same paces. You'll feel good and want to do more — don't. The rest IS the training.</div></div>
+    </div>`;
+  }
+  if (wk===24) {
+    html += `<div class="banner banner-race">
+      <div class="banner-icon">◈</div>
+      <div><div class="banner-title">RACE WEEK</div>
+      <div class="banner-text">Dublin Hyrox is Sunday. 24 weeks of work is done. Trust it. Rest. Eat. Sleep. Visualise.</div></div>
+    </div>`;
+  }
+
+  html += renderSession(sess, wk, dayIdx);
+  if (sess && sess.type !== "rest") html += renderNutriCard(dayIdx);
+
+  document.getElementById("dayContent").innerHTML = html;
+}
+
+function updateHeaderForWeek(wk) {
+  const ph = getPhase(wk);
+  const pd = PHASES[ph];
+  document.getElementById("phaseName").textContent = pd.name;
+  const fill = document.getElementById("phaseBarFill");
+  fill.style.width = `${Math.round((wk/25)*100)}%`;
+  fill.style.background = PHASE_COLOR[ph];
+  const weeksLeft = 25 - wk;
+  document.getElementById("countdownText").textContent =
+    weeksLeft <= 0 ? "RACE WEEK" : `${weeksLeft} WK${weeksLeft===1?'':'S'} TO DUBLIN`;
+}
+
+function switchDay(idx) {
+  currentDay = idx;
+  document.querySelectorAll(".day-chip").forEach((c,i)=>c.classList.toggle("active", i===idx));
+  renderDay(currentWeek, idx);
+}
+
+function changeWeek(delta) {
+  const inp = document.getElementById("weekInput");
+  let v = Math.max(1, Math.min(25, (parseInt(inp.value)||1) + delta));
+  inp.value = v; currentWeek = v;
+  updateHeaderForWeek(v);
+  renderDay(v, currentDay);
+}
+
+document.getElementById("weekInput").addEventListener("change", function() {
+  let v = Math.max(1, Math.min(25, parseInt(this.value)||1));
+  this.value = v; currentWeek = v;
+  updateHeaderForWeek(v);
+  renderDay(v, currentDay);
+});
+
+function switchView(view) {
+  ["training","log","reference"].forEach(v => {
+    document.getElementById(v==="training"?"trainingView":v==="log"?"logView":"referenceView")
+      .classList.toggle("active", v===view);
+    document.getElementById(v==="training"?"btnTraining":v==="log"?"btnLog":"btnReference")
+      .classList.toggle("active", v===view);
+  });
+  if (view==="log") renderLogView();
+  if (view==="reference" && !document.getElementById("referenceContent").dataset.built) renderReferenceView();
+}
+
+/* ============================================================================
+   LOG TAB
+   ============================================================================ */
+const DAY_NAMES = ["MON","TUE","WED","THU","FRI","SAT","SUN"];
+
+function cleanLogName(raw) {
+  return raw
+    .replace(/_pace$|_ski$|_feel$|_finish$/,'')
+    .replace(/^station_/,'◎ ')
+    .replace(/—.*$/,'')
+    .replace(/_/g,' ')
+    .trim();
+}
+
+function renderLogView() {
+  LOG_DATA = loadLog();
+  const weekKeys = Object.keys(LOG_DATA)
+    .filter(k => Object.keys(LOG_DATA[k]).some(d => Object.keys(LOG_DATA[k][d]).filter(x=>x!=="__names").length>0))
+    .sort((a,b)=>parseInt(b.replace('wk',''))-parseInt(a.replace('wk','')));
+
+  let html = `
+    <div class="log-hero">
+      <div class="log-hero-title">YOUR <span class="accent">LOG</span></div>
+      <div class="log-hero-sub">Every number you've entered, most recent week first. Saved on this device.</div>
+    </div>`;
+
+  if (weekKeys.length===0) {
+    html += `<div class="log-empty">
+      <div class="log-empty-icon">◷</div>
+      <div class="log-empty-title">Nothing logged yet</div>
+      <div class="log-empty-text">Log a weight, time, or pace on the Today tab — it shows up here automatically.</div>
+    </div>`;
+  } else {
+    weekKeys.forEach((wkKey, idx) => {
+      const wk = parseInt(wkKey.replace('wk',''));
+      const dayData = LOG_DATA[wkKey];
+      const dayKeys = Object.keys(dayData)
+        .filter(d => Object.keys(dayData[d]).filter(x=>x!=="__names").length>0)
+        .sort((a,b)=>parseInt(a.replace('d',''))-parseInt(b.replace('d','')));
+      let count = 0;
+      dayKeys.forEach(dk => count += Object.keys(dayData[dk]).filter(x=>x!=="__names").length);
+
+      html += `
+        <div class="log-week-card">
+          <div class="log-week-head" onclick="toggleLogWeek(this)">
+            <div class="log-week-title">Week ${wk}</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="log-week-count">${count}</span>
+              <span class="ref-arrow ${idx===0?'open':''}">▾</span>
+            </div>
+          </div>
+          <div class="log-week-body ${idx===0?'open':''}">`;
+
+      dayKeys.forEach(dk => {
+        const dayIdx = parseInt(dk.replace('d',''));
+        const names = dayData[dk].__names || {};
+        Object.keys(dayData[dk]).filter(x=>x!=="__names").forEach(key => {
+          const displayName = names[key] || key;
+          html += `<div class="log-row">
+              <div class="log-row-day">${DAY_NAMES[dayIdx]}</div>
+              <div class="log-row-name">${cleanLogName(displayName)}</div>
+              <div class="log-row-val">${dayData[dk][key]}</div>
+            </div>`;
+        });
+      });
+      html += `</div></div>`;
+    });
+    html += `<button class="danger-btn" onclick="confirmClearLog()">⊗ CLEAR ALL LOGGED DATA</button>`;
+  }
+  document.getElementById("logContent").innerHTML = html;
+}
+
+function toggleLogWeek(header) {
+  header.nextElementSibling.classList.toggle("open");
+  header.querySelector(".ref-arrow").classList.toggle("open");
+}
+function confirmClearLog() {
+  if (confirm("Delete all logged data on this device? This cannot be undone.")) {
+    localStorage.removeItem(STORAGE_KEY);
+    LOG_DATA = {};
+    renderLogView();
+  }
+}
+
+/* ============================================================================
+   REFERENCE TAB
+   ============================================================================ */
+function toggleRef(header) {
+  header.nextElementSibling.classList.toggle("open");
+  header.querySelector(".ref-arrow").classList.toggle("open");
+}
+
+function renderReferenceView() {
+  const html = `
+    <div class="ref-section">
+      <div class="ref-header" onclick="toggleRef(this)">
+        <div class="ref-header-left"><div class="ref-icon">♡</div><div class="ref-title">Heart Rate Zones</div></div>
+        <span class="ref-arrow">▾</span>
+      </div>
+      <div class="ref-body">
+        <div class="zone-row"><div class="zone-dot" style="background:var(--go)"></div><div class="zone-name">Z1 Recovery</div><div class="zone-range">&lt;137 bpm · &lt;70%</div><div class="zone-pace">6:30+/km</div></div>
+        <div class="zone-row"><div class="zone-dot" style="background:var(--info)"></div><div class="zone-name">Z2 Aerobic</div><div class="zone-range">137–157 bpm · 70–80%</div><div class="zone-pace">5:30–6:10</div></div>
+        <div class="zone-row"><div class="zone-dot" style="background:var(--volt)"></div><div class="zone-name">Z3 Tempo</div><div class="zone-range">157–172 bpm · 80–88%</div><div class="zone-pace">4:45–5:10</div></div>
+        <div class="zone-row"><div class="zone-dot" style="background:var(--warn)"></div><div class="zone-name">Z4 Threshold</div><div class="zone-range">172–182 bpm · 88–93%</div><div class="zone-pace">4:15–4:35</div></div>
+        <div class="zone-row"><div class="zone-dot" style="background:var(--stop)"></div><div class="zone-name">Z5 VO₂ Max</div><div class="zone-range">182–196 bpm · 93–100%</div><div class="zone-pace">&lt;4:15/km</div></div>
+      </div>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-header" onclick="toggleRef(this)">
+        <div class="ref-header-left"><div class="ref-icon">◯</div><div class="ref-title">McGill Big 3 — Every Session</div></div>
+        <span class="ref-arrow">▾</span>
+      </div>
+      <div class="ref-body">
+        <div class="mcgill-item"><div class="mcgill-name">Modified Curl-Up</div><div class="mcgill-desc">Lie on back, one knee bent. Hands under lumbar to maintain natural arch. Lift head and shoulders ONLY — not a crunch. Hold 8-10s. 3×10. Never flatten lower back into floor.</div></div>
+        <div class="mcgill-item"><div class="mcgill-name">Bird Dog</div><div class="mcgill-desc">Hands and knees. Extend opposite arm and leg simultaneously. Hold 8-10s. Return slowly. 3×10 per side. Hips stay LEVEL — do not rotate.</div></div>
+        <div class="mcgill-item"><div class="mcgill-name">Side Plank</div><div class="mcgill-desc">Side-lying, elbow under shoulder. Feet stacked or knees bent. Lift hips — straight line shoulder to foot. Hold 8-10s. 3 per side.</div></div>
+      </div>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-header" onclick="toggleRef(this)">
+        <div class="ref-header-left"><div class="ref-icon">◈</div><div class="ref-title">Race Day Strategy</div></div>
+        <span class="ref-arrow">▾</span>
+      </div>
+      <div class="ref-body">
+        <div class="race-station-ref run"><div class="station-num-ref">↗</div><div class="station-info-ref"><div class="station-name-ref">Run ×8</div><div class="station-spec-ref">8km total · start 5s slower than target</div></div><div class="station-target-ref">4:00/km</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">①</div><div class="station-info-ref"><div class="station-name-ref">Ski Erg</div><div class="station-spec-ref">1000m · arms down past hips</div></div><div class="station-target-ref">3:45–4:00</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">②</div><div class="station-info-ref"><div class="station-name-ref">Sled Push</div><div class="station-spec-ref">50m · 152kg total</div></div><div class="station-target-ref">1:45–2:15</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">③</div><div class="station-info-ref"><div class="station-name-ref">Sled Pull</div><div class="station-spec-ref">50m · 103kg total</div></div><div class="station-target-ref">1:30–2:00</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">④</div><div class="station-info-ref"><div class="station-name-ref">Burpee Broad Jump</div><div class="station-spec-ref">80m · never stop</div></div><div class="station-target-ref">3:00–3:30</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">⑤</div><div class="station-info-ref"><div class="station-name-ref">Rowing</div><div class="station-spec-ref">1000m · 1:45–1:52/500m</div></div><div class="station-target-ref">3:30–3:45</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">⑥</div><div class="station-info-ref"><div class="station-name-ref">Farmers Carry</div><div class="station-spec-ref">200m · 2×24kg</div></div><div class="station-target-ref">2:30–3:00</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">⑦</div><div class="station-info-ref"><div class="station-name-ref">Sandbag Lunges</div><div class="station-spec-ref">100m · 20kg</div></div><div class="station-target-ref">4:00–4:30</div></div>
+        <div class="race-station-ref"><div class="station-num-ref">⑧</div><div class="station-info-ref"><div class="station-name-ref">Wall Balls</div><div class="station-spec-ref">100 reps · 6kg · 3m target</div></div><div class="station-target-ref">4:30–5:00</div></div>
+      </div>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-header" onclick="toggleRef(this)">
+        <div class="ref-header-left"><div class="ref-icon">⚠</div><div class="ref-title">Injury & Back Flags</div></div>
+        <span class="ref-arrow">▾</span>
+      </div>
+      <div class="ref-body">
+        <div class="flag-item"><span class="flag-pill flag-stop">STOP</span><div class="flag-text"><strong>Neural symptoms</strong> — tingling, shooting pain or numbness down the leg. Stop immediately. 48hr rest minimum. See physio before returning.</div></div>
+        <div class="flag-item"><span class="flag-pill flag-stop">STOP</span><div class="flag-text"><strong>Sharp back pain during RDL or squat</strong> — rack the bar. Reduce load 20% and try single-leg alternatives only.</div></div>
+        <div class="flag-item"><span class="flag-pill flag-warn">MODIFY</span><div class="flag-text"><strong>Dull back ache after session</strong> — skip RDL and box squat next session. Split squats and KB swings only.</div></div>
+        <div class="flag-item"><span class="flag-pill flag-warn">MODIFY</span><div class="flag-text"><strong>Sick (cold, fever)</strong> — skip training until symptom-free 48hrs. Resume at 70% load for 2-3 sessions.</div></div>
+        <div class="flag-item"><span class="flag-pill flag-ok">OK</span><div class="flag-text"><strong>General fatigue</strong> — train but reduce intensity by 1 RPE point. Stay in Z2 on run days.</div></div>
+        <div class="flag-item"><span class="flag-pill flag-ok">OK</span><div class="flag-text"><strong>Missed 1 session</strong> — don't make it up. Continue with the next scheduled session.</div></div>
+      </div>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-header" onclick="toggleRef(this)">
+        <div class="ref-header-left"><div class="ref-icon">◐</div><div class="ref-title">Deload Week Guide</div></div>
+        <span class="ref-arrow">▾</span>
+      </div>
+      <div class="ref-body">
+        <div style="padding:16px 18px;">
+          <div class="cue-prose">
+            <strong>Why deload?</strong> Adaptation happens during recovery, not training. After 9 weeks of overload, the body needs a lower-stress week to consolidate gains.<br><br>
+            <strong>What changes:</strong> Volume drops ~40%. Loads drop ~15%. Paces stay the same.<br><br>
+            <strong>The trap:</strong> You'll feel good and want to add more. Don't. That feeling IS the deload working.<br><br>
+            <strong>Focus on:</strong> Sleep, food, niggles, soreness. Come back different.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ref-section">
+      <div class="ref-header" onclick="toggleRef(this)">
+        <div class="ref-header-left"><div class="ref-icon">◉</div><div class="ref-title">Wall Ball Training Guide</div></div>
+        <span class="ref-arrow">▾</span>
+      </div>
+      <div class="ref-body">
+        <div style="padding:16px 18px;" class="cue-prose">
+          <strong>Race spec:</strong> 100 reps · 6kg ball · 3m target · Men's Open<br><br>
+          <strong>Technique:</strong> Squat below parallel, ball at chest. Explosive leg drive. Release at face height. Catch at chest, straight into next squat.<br><br>
+          <strong>Phase 1:</strong> 3×15 reps, full rest, learn the movement.<br>
+          <strong>Phase 2:</strong> 3×25→35 reps, 90s rest, building to 100 total.<br>
+          <strong>Phase 3:</strong> 100 reps as fast as possible after all stations — sets of 20-25, 10s rest. Target sub-5:00.<br><br>
+          <strong>Race rule:</strong> A miss = 15 second penalty. Accuracy over speed.
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById("referenceContent").innerHTML = html;
+  document.getElementById("referenceContent").dataset.built = "1";
+}
+
+/* ============================================================================
+   INIT — load data from Firestore, then open on today's week and day
+   ============================================================================ */
+(async function init() {
+  // Load cloud data first (falls back to localStorage if offline)
+  await initStorage();
+
+  const PROGRAM_START = new Date("2026-05-18T00:00:00");
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+  const weeksSinceStart = Math.floor((today - PROGRAM_START) / msPerWeek) + 1;
+  const startWeek = Math.max(1, Math.min(25, weeksSinceStart));
+
+  const jsDow = today.getDay();
+  const appDay = jsDow === 0 ? 6 : jsDow - 1;
+
+  document.getElementById("weekInput").value = startWeek;
+  currentWeek = startWeek;
+  currentDay = appDay;
+
+  document.querySelectorAll(".day-chip").forEach((c, i) => c.classList.toggle("active", i === appDay));
+
+  updateHeaderForWeek(startWeek);
+  renderDay(startWeek, appDay);
+})();
+
+</script>
+</body>
+</html>
