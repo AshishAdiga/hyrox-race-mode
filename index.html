@@ -497,17 +497,13 @@ body {
   align-items: center;
   gap: 5px;
 }
-.saved-flag {
+.log-block-hint {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--go);
-  opacity: 0;
-  transition: opacity 0.25s;
-  display: flex;
-  align-items: center;
-  gap: 3px;
+  font-size: 9px;
+  color: var(--paper-faint);
+  letter-spacing: 0.2px;
+  font-style: italic;
 }
-.saved-flag.show { opacity: 1; }
 
 .set-row {
   display: flex;
@@ -526,22 +522,48 @@ body {
   flex-shrink: 0;
   letter-spacing: 0.3px;
 }
-.field {
+
+/* field-wrap holds the input + its persistent checkmark together */
+.field-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.field-wrap-reps { flex: 0.55; }
+.field-wrap-full { width: 100%; flex: none; }
+.field {
+  width: 100%;
   background: var(--ink-2);
   border: 1px solid var(--line);
   border-radius: 7px;
   color: var(--paper);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12.5px;
-  padding: 8px 10px;
+  padding: 8px 30px 8px 10px;
   outline: none;
   transition: border-color 0.15s, background 0.15s;
 }
 .field:focus { border-color: var(--volt); background: var(--ink); }
 .field::placeholder { color: var(--paper-faint); }
-.field-reps { flex: 0.55; }
+.field-wrap.is-saved .field { border-color: rgba(77,219,143,0.45); background: rgba(77,219,143,0.05); }
+.field-wrap.is-saved .field:focus { border-color: var(--volt); background: var(--ink); }
+
+/* Persistent checkmark — stays visible as long as a value is saved, not a fading flash */
+.field-check {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--go);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
 .field-x { font-family: 'JetBrains Mono', monospace; color: var(--paper-faint); font-size: 11px; flex-shrink: 0; }
 .set-prev {
   font-family: 'JetBrains Mono', monospace;
@@ -890,7 +912,7 @@ body {
   </button>
 </nav>
 
-<script type="module">
+<script>
 /* ============================================================================
    DATA LAYER — programmed sessions, all 25 weeks, all phases
    (FB1 / FB2 / FB3 / Tue / Thu / Sat session generators)
@@ -1282,36 +1304,53 @@ function getSessionForDay(wk, dayIdx) {
 
 /* ============================================================================
    FIREBASE — Firestore cloud sync + localStorage fallback
-   Every write goes to both. Reads come from Firestore on load,
-   falling back to localStorage if offline.
+   IMPORTANT: uses dynamic import() inside a try/catch, NOT a static top-level
+   import. A static import is blocking and fatal — if the Firebase CDN fails
+   to load for any reason (network, ad blocker, offline), the ENTIRE script
+   stops executing and every function in the app becomes "not defined".
+   Dynamic import() here means Firebase is optional: if it fails, the whole
+   app still works perfectly using localStorage only.
    ============================================================================ */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyA29E90-N-sdYUyoffeiVsi85HQeteuDSU",
-  authDomain: "hyrox-dublin.firebaseapp.com",
-  projectId: "hyrox-dublin",
-  storageBucket: "hyrox-dublin.firebasestorage.app",
-  messagingSenderId: "251584341799",
-  appId: "1:251584341799:web:4a42b16116c0ed4284ab02"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-
-// Single Firestore document — one doc holds all log data for this athlete
-const LOG_DOC = doc(db, "athletes", "ashish");
 const STORAGE_KEY = "raceModeLog_v2";
 let LOG_DATA = {};
 let DB_READY = false;
+let firestoreRefs = null; // { db, doc, getDoc, setDoc, LOG_DOC }
 
-// Sync indicator in header
 function showSyncStatus(state) {
   let el = document.getElementById("syncStatus");
   if (!el) return;
   el.textContent = state === "saving" ? "↑" : state === "saved" ? "✓" : state === "offline" ? "○" : "";
   el.style.color = state === "saved" ? "var(--go)" : state === "saving" ? "var(--volt)" : "var(--paper-faint)";
+}
+
+// Attempt to load Firebase. If this fails for ANY reason, the app keeps
+// working on localStorage alone — nothing else in the script is affected.
+async function tryConnectFirebase() {
+  try {
+    const [{ initializeApp }, { getFirestore, doc, getDoc, setDoc }] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js")
+    ]);
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA29E90-N-sdYUyoffeiVsi85HQeteuDSU",
+      authDomain: "hyrox-dublin.firebaseapp.com",
+      projectId: "hyrox-dublin",
+      storageBucket: "hyrox-dublin.firebasestorage.app",
+      messagingSenderId: "251584341799",
+      appId: "1:251584341799:web:4a42b16116c0ed4284ab02"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const db = getFirestore(firebaseApp);
+    const LOG_DOC = doc(db, "athletes", "ashish");
+
+    firestoreRefs = { getDoc, setDoc, LOG_DOC };
+    return true;
+  } catch(e) {
+    console.warn("Firebase failed to load — continuing with localStorage only.", e);
+    return false;
+  }
 }
 
 // Load from Firestore on startup, fall back to localStorage
@@ -1322,17 +1361,22 @@ async function initStorage() {
     if (local) LOG_DATA = JSON.parse(local);
   } catch(e) {}
 
+  const connected = await tryConnectFirebase();
+  if (!connected) {
+    showSyncStatus("offline");
+    return;
+  }
+
   try {
-    const snap = await getDoc(LOG_DOC);
+    const snap = await firestoreRefs.getDoc(firestoreRefs.LOG_DOC);
     if (snap.exists()) {
       LOG_DATA = snap.data().log || {};
-      // Write cloud data back to localStorage so offline works
       localStorage.setItem(STORAGE_KEY, JSON.stringify(LOG_DATA));
     }
     DB_READY = true;
     showSyncStatus("saved");
   } catch(e) {
-    console.warn("Firestore unavailable, using localStorage", e);
+    console.warn("Firestore read failed, using localStorage", e);
     showSyncStatus("offline");
   }
 }
@@ -1340,18 +1384,18 @@ async function initStorage() {
 // Debounced Firestore write — batches rapid keystrokes into one write
 let _syncTimer = null;
 function scheduleSyncToFirestore() {
+  if (!DB_READY) { showSyncStatus("offline"); return; }
   showSyncStatus("saving");
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(async () => {
-    if (!DB_READY) return;
     try {
-      await setDoc(LOG_DOC, { log: LOG_DATA, updatedAt: new Date().toISOString() });
+      await firestoreRefs.setDoc(firestoreRefs.LOG_DOC, { log: LOG_DATA, updatedAt: new Date().toISOString() });
       showSyncStatus("saved");
     } catch(e) {
       console.warn("Firestore write failed", e);
       showSyncStatus("offline");
     }
-  }, 1200); // wait 1.2s after last keystroke before writing
+  }, 1200);
 }
 
 function loadLog() { return LOG_DATA; }
@@ -1391,12 +1435,17 @@ function getLastValue(wk, dayIdx, key, lookback=4) {
 }
 function handleInput(el, wk, dayIdx, key, name) {
   setLogValue(wk, dayIdx, key, name, el.value);
-  const flag = el.closest(".log-block")?.querySelector(".saved-flag");
-  if (flag) {
-    flag.classList.add("show");
-    clearTimeout(flag._t);
-    flag._t = setTimeout(()=>flag.classList.remove("show"), 1100);
-  }
+  markFieldSaved(el, el.value.trim() !== "");
+}
+
+// Persistent save indicator — stays visible as long as the field has a value,
+// not just a 1-second flash. This is the fix for "no confirmation that data was entered."
+function markFieldSaved(el, hasValue) {
+  const wrap = el.closest(".field-wrap");
+  if (!wrap) return;
+  const check = wrap.querySelector(".field-check");
+  wrap.classList.toggle("is-saved", hasValue);
+  if (check) check.style.opacity = hasValue ? "1" : "0";
 }
 
 function parseSpec(spec) {
@@ -1422,14 +1471,22 @@ function renderSetLogRows(wk, dayIdx, exName, spec) {
     const lwReps = getLastValue(wk, dayIdx, repsKey);
     const lwText = (lwLoad || lwReps)
       ? `<div class="set-prev">prev: <span class="v">${lwLoad?.value||'–'}${lwReps?.value?' × '+lwReps.value:''}</span></div>` : "";
+    const loadSaved = curLoad.trim() !== "";
+    const repsSaved = curReps.trim() !== "";
     rows += `
       <div class="set-row">
         <span class="set-tag">SET ${i}</span>
-        <input type="text" class="field" placeholder="${loadHint}" value="${curLoad.replace(/"/g,'&quot;')}"
-          oninput="handleInput(this, ${wk}, ${dayIdx}, '${loadKey}', '${exName.replace(/'/g,"\\'")} — set ${i} load')">
+        <span class="field-wrap ${loadSaved?'is-saved':''}">
+          <input type="text" class="field" placeholder="${loadHint}" value="${curLoad.replace(/"/g,'&quot;')}"
+            oninput="handleInput(this, ${wk}, ${dayIdx}, '${loadKey}', '${exName.replace(/'/g,"\\'")} — set ${i} load')">
+          <span class="field-check" style="opacity:${loadSaved?1:0}">✓</span>
+        </span>
         <span class="field-x">×</span>
-        <input type="text" class="field field-reps" placeholder="${repsHint}" value="${curReps.replace(/"/g,'&quot;')}"
-          oninput="handleInput(this, ${wk}, ${dayIdx}, '${repsKey}', '${exName.replace(/'/g,"\\'")} — set ${i} reps')">
+        <span class="field-wrap field-wrap-reps ${repsSaved?'is-saved':''}">
+          <input type="text" class="field field-reps" placeholder="${repsHint}" value="${curReps.replace(/"/g,'&quot;')}"
+            oninput="handleInput(this, ${wk}, ${dayIdx}, '${repsKey}', '${exName.replace(/'/g,"\\'")} — set ${i} reps')">
+          <span class="field-check" style="opacity:${repsSaved?1:0}">✓</span>
+        </span>
       </div>
       ${lwText}`;
   }
@@ -1437,7 +1494,7 @@ function renderSetLogRows(wk, dayIdx, exName, spec) {
     <div class="log-block">
       <div class="log-block-head">
         <span class="log-block-title">⏺ LOG YOUR SETS</span>
-        <span class="saved-flag">✓ SAVED</span>
+        <span class="log-block-hint">tap a field to edit</span>
       </div>
       ${rows}
     </div>`;
@@ -1448,14 +1505,18 @@ function renderSingleLog(wk, dayIdx, name, placeholder) {
   const cur = getLogValue(wk, dayIdx, slug);
   const lw = getLastValue(wk, dayIdx, slug);
   const lwHtml = lw ? `<div class="prev-pill">📌 ${lw.weeksAgo===1?'last week':lw.weeksAgo+' wks ago'}: ${lw.value}</div>` : "";
+  const isSaved = cur.trim() !== "";
   return `
     <div class="log-block">
       <div class="log-block-head">
         <span class="single-log-label">YOU DID</span>
-        <span class="saved-flag">✓ SAVED</span>
+        <span class="log-block-hint">tap to edit</span>
       </div>
-      <input type="text" class="field" placeholder="${placeholder||'enter value'}" value="${cur.replace(/"/g,'&quot;')}"
-        oninput="handleInput(this, ${wk}, ${dayIdx}, '${slug}', '${name.replace(/'/g,"\\'")}')">
+      <span class="field-wrap field-wrap-full ${isSaved?'is-saved':''}">
+        <input type="text" class="field" placeholder="${placeholder||'enter value'}" value="${cur.replace(/"/g,'&quot;')}"
+          oninput="handleInput(this, ${wk}, ${dayIdx}, '${slug}', '${name.replace(/'/g,"\\'")}')">
+        <span class="field-check" style="opacity:${isSaved?1:0}">✓</span>
+      </span>
       ${lwHtml}
     </div>`;
 }
@@ -1919,6 +1980,19 @@ function renderReferenceView() {
   document.getElementById("referenceContent").innerHTML = html;
   document.getElementById("referenceContent").dataset.built = "1";
 }
+
+/* ============================================================================
+   GLOBAL EXPOSURE — required because type="module" scopes everything locally.
+   Inline onclick/oninput attributes in the HTML can only call window.* functions.
+   This was the bug freezing all navigation — fixed here.
+   ============================================================================ */
+window.switchDay = switchDay;
+window.changeWeek = changeWeek;
+window.switchView = switchView;
+window.toggleRef = toggleRef;
+window.toggleLogWeek = toggleLogWeek;
+window.confirmClearLog = confirmClearLog;
+window.handleInput = handleInput;
 
 /* ============================================================================
    INIT — load data from Firestore, then open on today's week and day
