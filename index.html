@@ -580,6 +580,25 @@ body {
   align-items: center;
   gap: 8px;
 }
+
+/* Day notes textarea */
+.notes-area {
+  width: 100%;
+  min-height: 90px;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--paper);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+.notes-area:focus { border-color: var(--volt); }
+.notes-area::placeholder { color: var(--paper-faint); font-style: italic; }
 .single-log-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
@@ -907,10 +926,17 @@ body {
   <button class="nav-btn" id="btnLog" onclick="switchView('log')">
     <span class="nav-icon">◷</span>LOG
   </button>
+  <button class="nav-btn" id="btnWeight" onclick="switchView('weight')">
+    <span class="nav-icon">◎</span>WEIGHT
+  </button>
   <button class="nav-btn" id="btnReference" onclick="switchView('reference')">
     <span class="nav-icon">◈</span>GUIDE
   </button>
 </nav>
+
+<div id="weightView" class="view">
+  <div class="content" id="weightContent"></div>
+</div>
 
 <script>
 /* ============================================================================
@@ -1710,6 +1736,32 @@ function renderNutriCard(dayIdx) {
   return html;
 }
 
+function renderDayNotes(wk, dayIdx) {
+  const key = `day_notes`;
+  const slug = `wk${wk}_d${dayIdx}_notes`;
+  const cur = getLogValue(wk, dayIdx, slug);
+  const hasSaved = cur.trim() !== "";
+  return `
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--surface-2);">✏</div>
+        <div class="card-title-group">
+          <div class="card-title">Day Notes</div>
+          <div class="card-sub">How did it go? Anything to flag next week.</div>
+        </div>
+        ${hasSaved ? '<span class="card-tag" style="background:var(--go-dim);color:var(--go);border:1px solid rgba(77,219,143,0.3);">SAVED</span>' : ''}
+      </div>
+      <div class="block">
+        <textarea
+          id="dayNotesArea"
+          class="notes-area"
+          placeholder="e.g. Back felt tight on RDL, dropped to 75kg. Sleep was poor — 5hrs. Left shin quiet today."
+          oninput="handleInput(this, ${wk}, ${dayIdx}, '${slug}', 'Day notes')"
+        >${cur}</textarea>
+      </div>
+    </div>`;
+}
+
 function renderDay(wk, dayIdx) {
   const sess = getSessionForDay(wk, dayIdx);
   const isDeload = wk===10;
@@ -1742,6 +1794,7 @@ function renderDay(wk, dayIdx) {
 
   html += renderSession(sess, wk, dayIdx);
   if (sess && sess.type !== "rest") html += renderNutriCard(dayIdx);
+  html += renderDayNotes(wk, dayIdx);
 
   document.getElementById("dayContent").innerHTML = html;
 }
@@ -1780,13 +1833,14 @@ document.getElementById("weekInput").addEventListener("change", function() {
 });
 
 function switchView(view) {
-  ["training","log","reference"].forEach(v => {
-    document.getElementById(v==="training"?"trainingView":v==="log"?"logView":"referenceView")
-      .classList.toggle("active", v===view);
-    document.getElementById(v==="training"?"btnTraining":v==="log"?"btnLog":"btnReference")
-      .classList.toggle("active", v===view);
+  ["training","log","weight","reference"].forEach(v => {
+    const viewId = v==="training"?"trainingView":v==="log"?"logView":v==="weight"?"weightView":"referenceView";
+    const btnId  = v==="training"?"btnTraining":v==="log"?"btnLog":v==="weight"?"btnWeight":"btnReference";
+    document.getElementById(viewId).classList.toggle("active", v===view);
+    document.getElementById(btnId).classList.toggle("active", v===view);
   });
   if (view==="log") renderLogView();
+  if (view==="weight") renderWeightView();
   if (view==="reference" && !document.getElementById("referenceContent").dataset.built) renderReferenceView();
 }
 
@@ -1982,9 +2036,251 @@ function renderReferenceView() {
 }
 
 /* ============================================================================
-   GLOBAL EXPOSURE — required because type="module" scopes everything locally.
-   Inline onclick/oninput attributes in the HTML can only call window.* functions.
-   This was the bug freezing all navigation — fixed here.
+   BODYWEIGHT TRACKER
+   Completely separate key from session log — raceModeWeight_v1 vs raceModeLog_v2.
+   No overlap possible. Adding entries here cannot affect session log data.
+   ============================================================================ */
+const WEIGHT_KEY = "raceModeWeight_v1";
+
+function loadWeightLog() {
+  try { const r = localStorage.getItem(WEIGHT_KEY); return r ? JSON.parse(r) : []; }
+  catch(e) { return []; }
+}
+function saveWeightLog(entries) {
+  try { localStorage.setItem(WEIGHT_KEY, JSON.stringify(entries)); }
+  catch(e) {}
+  // Also sync to Firestore if connected — stored separately from session log
+  if (DB_READY && firestoreRefs) {
+    clearTimeout(saveWeightLog._t);
+    saveWeightLog._t = setTimeout(async () => {
+      try {
+        const { setDoc, doc, LOG_DOC } = firestoreRefs;
+        // Store weight under a sibling doc athletes/ashish_weight to keep it separate
+        const { getFirestore } = firestoreRefs;
+        // Simple approach: store weight array in the same doc under a 'weight' key
+        await firestoreRefs.setDoc(
+          firestoreRefs.LOG_DOC,
+          { weight: entries },
+          { merge: true }  // merge: true so session log data is untouched
+        );
+      } catch(e) { console.warn("Weight Firestore sync failed", e); }
+    }, 1200);
+  }
+}
+
+function logWeight(kg) {
+  const entries = loadWeightLog();
+  const today = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  // Update today's entry if it exists, otherwise add new
+  const idx = entries.findIndex(e => e.date === today);
+  if (idx >= 0) entries[idx].kg = kg;
+  else entries.push({ date: today, kg });
+  // Keep sorted newest first, cap at 200 entries (covers the whole program many times over)
+  entries.sort((a,b) => b.date.localeCompare(a.date));
+  if (entries.length > 200) entries.splice(200);
+  saveWeightLog(entries);
+  return entries;
+}
+
+function deleteWeightEntry(date) {
+  const entries = loadWeightLog().filter(e => e.date !== date);
+  saveWeightLog(entries);
+  renderWeightView();
+}
+window.deleteWeightEntry = deleteWeightEntry;
+
+function submitWeight() {
+  const input = document.getElementById("weightInput");
+  const val = parseFloat(input.value);
+  if (!val || val < 30 || val > 250) {
+    input.style.borderColor = "var(--stop)";
+    setTimeout(() => input.style.borderColor = "", 800);
+    return;
+  }
+  const entries = logWeight(val);
+  input.value = "";
+  renderWeightView();
+}
+window.submitWeight = submitWeight;
+
+function handleWeightKey(e) { if (e.key === "Enter") submitWeight(); }
+window.handleWeightKey = handleWeightKey;
+
+function buildSparkline(entries, width=320, height=80) {
+  // Take the most recent 10 entries, oldest first for left→right chart
+  const points = entries.slice(0,10).reverse();
+  if (points.length < 2) return "";
+
+  const kgs = points.map(p => p.kg);
+  const minKg = Math.min(...kgs);
+  const maxKg = Math.max(...kgs);
+  const range = maxKg - minKg || 1;
+  const pad = 12;
+
+  const coords = points.map((p, i) => {
+    const x = pad + (i / (points.length - 1)) * (width - pad*2);
+    const y = pad + (1 - (p.kg - minKg) / range) * (height - pad*2);
+    return {x, y, kg: p.kg, date: p.date};
+  });
+
+  const pathD = coords.map((c,i) => `${i===0?'M':'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+
+  // Gradient fill under the line
+  const fillD = pathD + ` L${coords[coords.length-1].x.toFixed(1)},${height} L${coords[0].x.toFixed(1)},${height} Z`;
+
+  const dots = coords.map(c => `
+    <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="3.5" fill="var(--volt)" stroke="var(--ink)" stroke-width="1.5"/>
+  `).join('');
+
+  // Min/max labels
+  const highest = coords.reduce((a,b) => a.kg > b.kg ? a : b);
+  const lowest  = coords.reduce((a,b) => a.kg < b.kg ? a : b);
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg"
+         style="width:100%;height:${height}px;display:block;overflow:visible;">
+      <defs>
+        <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--volt)" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="var(--volt)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="${fillD}" fill="url(#wGrad)"/>
+      <path d="${pathD}" fill="none" stroke="var(--volt)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}
+      <text x="${highest.x.toFixed(1)}" y="${(highest.y - 7).toFixed(1)}"
+            fill="var(--go)" font-family="JetBrains Mono,monospace" font-size="9" text-anchor="middle">${highest.kg}kg</text>
+      ${lowest.kg !== highest.kg ? `<text x="${lowest.x.toFixed(1)}" y="${(lowest.y + 14).toFixed(1)}"
+            fill="var(--stop)" font-family="JetBrains Mono,monospace" font-size="9" text-anchor="middle">${lowest.kg}kg</text>` : ''}
+    </svg>`;
+}
+
+function renderWeightView() {
+  const entries = loadWeightLog();
+  const today = new Date().toISOString().slice(0,10);
+  const todayEntry = entries.find(e => e.date === today);
+  const latest = entries[0];
+  const startWeight = entries.length > 0 ? entries[entries.length-1].kg : null;
+  const change = (latest && startWeight && entries.length > 1)
+    ? (latest.kg - startWeight).toFixed(1) : null;
+  const changeColor = change === null ? "var(--paper-dim)"
+    : parseFloat(change) < 0 ? "var(--go)" : parseFloat(change) > 0 ? "var(--stop)" : "var(--paper-dim)";
+
+  let html = `
+    <div style="margin-bottom:18px;">
+      <div style="font-family:'Archivo Expanded',sans-serif;font-weight:800;font-size:26px;letter-spacing:0.3px;margin-bottom:5px;">
+        BODY<span style="color:var(--volt)">WEIGHT</span>
+      </div>
+      <div style="font-size:12.5px;color:var(--paper-faint);">Log once a day, same time each morning.</div>
+    </div>
+
+    <!-- Entry card -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--volt-dim);">⚖</div>
+        <div class="card-title-group">
+          <div class="card-title">Today's Weight</div>
+          <div class="card-sub">${today} · ${todayEntry ? `logged: ${todayEntry.kg}kg` : 'not logged yet'}</div>
+        </div>
+      </div>
+      <div class="block">
+        <div class="block-eyebrow">LOG YOUR WEIGHT</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="field-wrap field-wrap-full" style="flex:1;max-width:160px;">
+            <input type="number" id="weightInput" class="field" placeholder="${todayEntry ? todayEntry.kg : '85.0'}"
+              step="0.1" min="30" max="250" onkeydown="handleWeightKey(event)"
+              style="padding-right:10px;">
+          </span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--paper-faint);flex-shrink:0;">kg</span>
+          <button onclick="submitWeight()" style="
+            background:var(--volt);color:var(--on-volt);border:none;border-radius:8px;
+            font-family:'Archivo Expanded',sans-serif;font-weight:700;font-size:12px;
+            padding:9px 16px;cursor:pointer;flex-shrink:0;letter-spacing:0.5px;">
+            ${todayEntry ? 'UPDATE' : 'SAVE'}
+          </button>
+        </div>
+        ${todayEntry ? `<div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--go);">✓ TODAY LOGGED — ${todayEntry.kg}kg · tap to update</div>` : ''}
+      </div>
+    </div>`;
+
+  // Stats row if we have data
+  if (entries.length > 0) {
+    html += `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+      <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--paper-faint);letter-spacing:1px;margin-bottom:6px;">CURRENT</div>
+        <div style="font-family:'Archivo Expanded',sans-serif;font-size:20px;font-weight:800;color:var(--volt);">${latest.kg}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--paper-faint);">kg</div>
+      </div>
+      <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--paper-faint);letter-spacing:1px;margin-bottom:6px;">START</div>
+        <div style="font-family:'Archivo Expanded',sans-serif;font-size:20px;font-weight:800;color:var(--paper-dim);">${startWeight}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--paper-faint);">kg</div>
+      </div>
+      <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--paper-faint);letter-spacing:1px;margin-bottom:6px;">CHANGE</div>
+        <div style="font-family:'Archivo Expanded',sans-serif;font-size:20px;font-weight:800;color:${changeColor};">${change !== null ? (parseFloat(change) > 0 ? '+':'')+change : '—'}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--paper-faint);">kg</div>
+      </div>
+    </div>`;
+  }
+
+  // Sparkline chart
+  if (entries.length >= 2) {
+    html += `
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--volt-dim);">↗</div>
+        <div class="card-title-group">
+          <div class="card-title">Trend</div>
+          <div class="card-sub">Last ${Math.min(entries.length,10)} entries</div>
+        </div>
+      </div>
+      <div class="block">${buildSparkline(entries)}</div>
+    </div>`;
+  }
+
+  // History list
+  if (entries.length > 0) {
+    html += `
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-head">
+        <div class="card-icon" style="background:var(--surface-2);">◳</div>
+        <div class="card-title-group"><div class="card-title">History</div></div>
+      </div>`;
+    entries.slice(0,30).forEach(e => {
+      const isToday = e.date === today;
+      html += `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-bottom:1px solid var(--line);">
+        <div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:${isToday?'var(--volt)':'var(--paper-dim)'};">${e.date}</span>
+          ${isToday ? '<span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--volt);margin-left:6px;background:var(--volt-dim);padding:2px 6px;border-radius:4px;">TODAY</span>' : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-family:'Archivo Expanded',sans-serif;font-weight:700;font-size:15px;color:var(--paper);">${e.kg} <span style="font-size:11px;color:var(--paper-faint);font-family:'JetBrains Mono',monospace;font-weight:400;">kg</span></span>
+          <button onclick="deleteWeightEntry('${e.date}')" style="background:none;border:1px solid var(--line);border-radius:6px;color:var(--paper-faint);font-size:11px;padding:3px 8px;cursor:pointer;">✕</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (entries.length === 0) {
+    html += `
+    <div style="text-align:center;padding:40px 24px;color:var(--paper-faint);">
+      <div style="font-size:32px;margin-bottom:12px;">⚖</div>
+      <div style="font-size:13px;">Log your first weigh-in above.<br>Chart appears after 2 entries.</div>
+    </div>`;
+  }
+
+  document.getElementById("weightContent").innerHTML = html;
+}
+
+
+
+/* ============================================================================
+   GLOBAL EXPOSURE — functions called via inline onclick/oninput need to be
+   on window. Plain script so not strictly required but kept for safety.
    ============================================================================ */
 window.switchDay = switchDay;
 window.changeWeek = changeWeek;
@@ -1993,6 +2289,9 @@ window.toggleRef = toggleRef;
 window.toggleLogWeek = toggleLogWeek;
 window.confirmClearLog = confirmClearLog;
 window.handleInput = handleInput;
+window.submitWeight = submitWeight;
+window.handleWeightKey = handleWeightKey;
+window.deleteWeightEntry = deleteWeightEntry;
 
 /* ============================================================================
    INIT — load data from Firestore, then open on today's week and day
